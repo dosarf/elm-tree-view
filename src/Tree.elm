@@ -5,11 +5,18 @@ module Tree exposing
   , treeHeight, forestHeight
   , joinTree, joinForest
   , listTreeNodes, listForestNodes
-  , AnnotatedNode, listAnnotatedTreeNodes, listAnnotatedForestNodes)
+  , AnnotatedNode, listAnnotatedTreeNodes, listAnnotatedForestNodes
+  )
 
 {-| A module containing a tree (model) facility + handy functions. This tree
 is _not_ a search tree (e.g. binary tree), it's for representing hierarchical
 information to users (e.g. folder-file structure, document structure, etc).
+
+## Traversal
+Utility functions (currently) traverse the tree in depth-first, and children of a node
+in left to right order.
+
+## Node data structure
 
 @docs Node
 
@@ -223,7 +230,7 @@ joinFoldOptions nodeToString separator =
     }
 
 {-| Joins the text representation of all nodes of a tree into a single string,
-separated by given separator, in descending and left->right traversal order.
+separated by given separator, in the traversal order.
 Will never be an empty string.
 -}
 joinTree : (Node d -> String) -> String -> Node d -> String
@@ -240,7 +247,7 @@ joinForest nodeToString separator nodes =
 
 
 {-| A node annotated with
-* zero-based index of the node in the order of traversal
+* zero-based index of the node, in the traversal order
 * zero-based level of the node (level is less then the height of the tree
   the node is in)
 * the node itself.
@@ -281,7 +288,7 @@ listAnnotatedFoldOptions =
         }
     }
 
-{-| Lists the nodes of a tree, annotated, in descending and left->right traversal order.
+{-| Lists the nodes of a tree, annotated, in the traversal order.
 Will never be an empty list. See [`AnnotatedNode`](#AnnotatedNode) for what a node
 is annotated with.
 -}
@@ -304,7 +311,7 @@ listFoldOptions =
     | preFoldingThunk = \foldStateFromParent node -> foldStateFromParent ++ [ node ]
     }
 
-{-| Lists the nodes of a tree, in descending and left->right traversal order.
+{-| Lists the nodes of a tree, in the traversal order.
 Will never be an empty list.
 -}
 listTreeNodes : Node d -> List (Node d)
