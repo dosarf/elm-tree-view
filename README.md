@@ -11,7 +11,7 @@ some usual UI interaction, such as
 ## Demo
 Check out
 * the working [demo](https://dosarf.github.io/tree-view-demo/index.html),
-* or the [demo sources](https://github.com/dosarf/elm-tree-view/demo).
+* or the [demo sources](https://github.com/dosarf/elm-tree-view/tree/master/demo).
 
 ## Overview
 To take it into use
@@ -22,8 +22,6 @@ To take it into use
 * build a tree of nodes, putting your data into them,
 * initialize the TreeView model, and otherwise interact with your tree view
   in the usual [TEA](https://guide.elm-lang.org/architecture/) manner
-
-For details, see [TreeView](TreeView)
 
 ## Test
 * Install `elm-test` (with `npm`)

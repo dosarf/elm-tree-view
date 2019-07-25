@@ -17,7 +17,7 @@ module TreeView exposing
     [`subscriptions`](#subscriptions).
 * Provide manually the required CSS definitions to make your tree view look usable & nice,
   * for a basic working CSS see
-  [Demo CSS](https://github.com/dosarf/elm-tree-view/demo/src/assets/tree-view.css).
+  [Demo CSS](https://github.com/dosarf/elm-tree-view/tree/master/demo/src/assets/tree-view.css).
 
 Also, non-leaf nodes can also be collapsed / expanded programmatically, as well
 as selected node and visible nodes can be retrieved.
@@ -75,7 +75,7 @@ set of CSS class names, see also [`defaultCssClasses`](#defaultCssClasses).
 
 The actual CSS definitions must _always_ be provided manually, even when the
 default CSS class names are used. For a working default CSS declarations,
-see [Demo CSS](https://github.com/dosarf/elm-tree-view/demo/src/assets/tree-view.css).
+see [Demo CSS](https://github.com/dosarf/elm-tree-view/tree/master/demo/src/assets/tree-view.css).
 -}
 type alias CssClasses =
     { treeViewCssClass : String
