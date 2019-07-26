@@ -5,6 +5,7 @@ import Css exposing (Color, hex, px, rgb, width)
 import Html.Styled exposing (a, Html, div, footer, h1, header, main_, map, text, toUnstyled)
 import Html.Styled.Attributes exposing (css, href, src)
 import SimpleTreeTab
+import RecursiveJsonTreeTab
 import Mwc.Button
 import Mwc.Tabs
 import Mwc.TextField
@@ -13,13 +14,15 @@ import Mwc.TextField
 type alias Model =
     { currentTab : Int
     , simpleTreeModel : SimpleTreeTab.Model
+    , recursiveJsonTreeModel : RecursiveJsonTreeTab.Model
     }
 
 
 initModel : () -> (Model, Cmd Msg)
 initModel () =
-    ( { currentTab = 0
+    ( { currentTab = 1
       , simpleTreeModel = SimpleTreeTab.initialModel
+      , recursiveJsonTreeModel = RecursiveJsonTreeTab.initialModel
       }
     , Cmd.none
     )
@@ -28,6 +31,7 @@ initModel () =
 type Msg
     = SelectTab Int
     | SimpleTreeMsg SimpleTreeTab.Msg
+    | RecurseJsonTreeMsg RecursiveJsonTreeTab.Msg
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -40,6 +44,11 @@ update msg model =
 
         SimpleTreeMsg simpleTreeMsg ->
             ( { model | simpleTreeModel = SimpleTreeTab.update simpleTreeMsg model.simpleTreeModel }
+            , Cmd.none
+            )
+
+        RecurseJsonTreeMsg recurseJsonTreeMsg ->
+            ( { model | recursiveJsonTreeModel = RecursiveJsonTreeTab.update recurseJsonTreeMsg model.recursiveJsonTreeModel }
             , Cmd.none
             )
 
@@ -73,12 +82,13 @@ view model =
             []
             [ h1 [] [ text "Elm TreeView demo" ] ]
         , div
-            [ css [ width (px 400) ] ]
+            [ css [ width (px 600) ] ]
             [ Mwc.Tabs.view
                 [ Mwc.Tabs.selected model.currentTab
                 , Mwc.Tabs.onClick SelectTab
                 , Mwc.Tabs.tabText
                     [ text "Simple TreeView"
+                    , text "Recursive Json TreeView"
                     ]
                 ]
             , tabContentView model
@@ -92,14 +102,20 @@ view model =
 tabContentView : Model -> Html Msg
 tabContentView model =
     case model.currentTab of
-        _ ->
+        0 ->
             map SimpleTreeMsg (SimpleTreeTab.view model.simpleTreeModel)
+
+        _ ->
+            map RecurseJsonTreeMsg (RecursiveJsonTreeTab.view model.recursiveJsonTreeModel)
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
     case model.currentTab of
-        _ ->
+        0 ->
             Sub.map SimpleTreeMsg (SimpleTreeTab.subscriptions model.simpleTreeModel)
+
+        _ ->
+            Sub.map RecurseJsonTreeMsg (RecursiveJsonTreeTab.subscriptions model.recursiveJsonTreeModel)
 
 main =
     Browser.element
