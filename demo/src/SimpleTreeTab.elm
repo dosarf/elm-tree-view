@@ -110,11 +110,8 @@ selectedNodeDetails : Model -> Html Msg
 selectedNodeDetails model =
     let
         selectedDetails =
-            case model.selectedNode of
-                Nothing ->
-                    "(nothing selected)"
-                Just nodeData ->
-                    nodeData.uid ++ ": " ++ nodeData.label
+            Maybe.map (\nodeData -> nodeData.uid ++ ": " ++ nodeData.label) model.selectedNode
+                |> Maybe.withDefault "(nothing selected)"
     in
         div
             [ css [ width (px 300) ] ]
