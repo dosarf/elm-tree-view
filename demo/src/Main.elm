@@ -52,6 +52,19 @@ theme =
     , secondary = rgb 250 240 230
     }
 
+referenceLinks : Html Msg
+referenceLinks =
+    div
+      []
+      [ text "See "
+      , a
+          [ href "https://github.com/dosarf/elm-tree-view/tree/master/demo" ]
+          [ text "demo" ]
+      , text " for Elm package "
+      , a
+          [ href "https://package.elm-lang.org/packages/dosarf/elm-tree-view/latest" ]
+          [ text "'dosarf/elm-tree-view'" ]
+      ]
 
 view : Model -> Html Msg
 view model =
@@ -72,11 +85,7 @@ view model =
             ]
         , footer
             []
-            [ text "See "
-            , a
-                [ href "https://github.com/dosarf/elm-tree-view/demo" ]
-                [ text "Demo for package 'dosarf/elm-tree-view' on github" ]
-            ]
+            [ referenceLinks ]
         ]
 
 
