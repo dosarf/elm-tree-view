@@ -1,5 +1,5 @@
 module RecursiveJsonTreeTab exposing (
-    Model, Msg, initialModel, update, view, subscriptions
+    Model, Msg, initializeModel, update, view, subscriptions
     -- for testing
     , Comment, CommentData, commentDecoder, commentToTree, CommentUid, Responses(..))
 
@@ -11,6 +11,7 @@ import TreeView as TV
 import Mwc.Button
 import Mwc.TextField
 import Json.Decode as D
+import Http
 
 type alias CommentUid =
     ( String
@@ -70,7 +71,7 @@ type alias CommentThread =
     }
 
 type alias Model =
-    { jsonInput : String
+    { jsonInput : Maybe String
     , commentThread : Result String CommentThread
     }
 
@@ -83,7 +84,10 @@ parseJsonAndUpdate json model =
             |> Result.map (\treeViewModel -> CommentThread treeViewModel Nothing False)
             |> Result.mapError D.errorToString
     in
-        { model | commentThread = commentThread }
+        { model
+        | jsonInput = Just json
+        , commentThread = commentThread
+        }
 
 commentUidLabel : CommentUid -> String
 commentUidLabel (thread, sequence) =
@@ -105,57 +109,75 @@ configuration : TV.Configuration CommentData CommentUid
 configuration =
     TV.Configuration nodeUid nodeLabel TV.defaultCssClasses
 
--- TODO load this on start instead of embedding
-demoJson : String
-demoJson =
-    """{  "author": "Jane Doe",
-          "message": "I don't like this",
-          "uid": ["janedoe-thread-123", 0],
-          "responses": [
-            { "author": "John Deer",
-              "message": "What is it exactly you don't like?",
-              "uid": ["janedoe-thread-123", 1],
-              "responses" : [ {
-                  "author": "Jane Doe",
-                  "message": "None of it",
-                  "uid": ["janedoe-thread-123", 2],
-                  "responses": []
-                }
-              ]
-            },
-            { "author": "Jake Steer",
-              "message": "Me neither",
-              "uid": ["janedoe-thread-123", 3],
-              "responses": []
-            }
-          ]
-}"""
-
-initialModel : Model
-initialModel =
-    parseJsonAndUpdate
-        demoJson
-        { jsonInput = demoJson
-        , commentThread = Result.Err "Empty JSON"
+loadJsonRequest : Cmd Msg
+loadJsonRequest =
+    Http.get
+        { url = "data/sample-comment-thread.json"
+        , expect = Http.expectString JsonLoaded
         }
+
+emptyModel : Model
+emptyModel =
+    { jsonInput = Nothing
+    , commentThread = Result.Err "Empty JSON"
+    }
+
+initializeModel : (Model, Cmd Msg)
+initializeModel =
+    ( emptyModel
+    , loadJsonRequest
+    )
 
 type Msg =
     TreeViewMsg (TV.Msg CommentUid)
     | ParseJson
-    | JsonInput String
+    | JsonEdited String
+    | JsonLoaded (Result.Result Http.Error String)
 
-update : Msg -> Model -> Model
+httpErrorToString : Http.Error -> String
+httpErrorToString httpError =
+    case httpError of
+        Http.BadUrl string ->
+            "Bad URL " ++ string
+        Http.Timeout ->
+            "Timeout"
+        Http.NetworkError ->
+            "Network error"
+        Http.BadStatus int ->
+            "Bad status " ++ (String.fromInt int)
+        Http.BadBody string ->
+            "Bad body " ++ string
+
+update : Msg -> Model -> (Model, Cmd Msg)
 update message model =
     case message of
-        JsonInput jsonInput ->
-            { model
-            | jsonInput = jsonInput
-            , commentThread =
-                Result.map (\cT -> { cT | treeViewActive = False }) model.commentThread
-            }
+        JsonEdited jsonInput ->
+            ( { model
+              | jsonInput = Just jsonInput
+              , commentThread =
+                    Result.map (\cT -> { cT | treeViewActive = False }) model.commentThread
+              }
+            , Cmd.none
+            )
 
         ParseJson ->
-            parseJsonAndUpdate model.jsonInput model
+            ( Maybe.map (\jsonInput -> parseJsonAndUpdate jsonInput model) model.jsonInput
+                |> Maybe.withDefault model
+            , Cmd.none
+            )
+
+        JsonLoaded result ->
+            case result of
+                Result.Err httpError ->
+                  ( { jsonInput = Nothing
+                    , commentThread = Result.Err <| httpErrorToString httpError
+                    }
+                  , Cmd.none
+                  )
+                Result.Ok jsonInput ->
+                  ( parseJsonAndUpdate jsonInput emptyModel
+                  , Cmd.none
+                  )
 
         TreeViewMsg tvMsg ->
             let
@@ -164,9 +186,11 @@ update message model =
                         |> Result.map (\cT -> {cT | treeViewModel = TV.update tvMsg cT.treeViewModel, treeViewActive = True } )
                         |> Result.map (\cT -> {cT | selectedComment = TV.getSelected cT.treeViewModel |> Maybe.map .node |> Maybe.map T.dataOf })
             in
-                { model
-                | commentThread = commentThread
-                }
+                ( { model
+                  | commentThread = commentThread
+                  }
+                , Cmd.none
+                )
 
 
 jsonInputTextArea : Model -> Html Msg
@@ -174,21 +198,22 @@ jsonInputTextArea model =
     div
       []
       [ Mwc.TextField.view
-          [ Mwc.TextField.onInput JsonInput
-          , Mwc.TextField.value model.jsonInput
+          [ Mwc.TextField.onInput JsonEdited
+          , Mwc.TextField.value <| Maybe.withDefault "" model.jsonInput
           , Mwc.TextField.textArea
           , Mwc.TextField.placeHolder "Comment JSON"
           ]
       ]
 
-parseJsonButton : Html Msg
-parseJsonButton =
+parseJsonButton : Model -> Html Msg
+parseJsonButton model =
     div
       []
       [ Mwc.Button.view
           [ Mwc.Button.raised
           , Mwc.Button.onClick ParseJson
           , Mwc.Button.label "Parse JSON"
+          , Mwc.Button.disabled (Maybe.map (\jsonInput -> False ) model.jsonInput |> Maybe.withDefault True)
           ]
       ]
 
@@ -208,8 +233,8 @@ selectedCommentDetails commentThread =
                 ]
             ]
 
-parseErrorDetails : String -> Html Msg
-parseErrorDetails error =
+errorDetailsArea : String -> Html Msg
+errorDetailsArea error =
     div
         [ css [ width (px 600) ] ]
         [ Mwc.TextField.view
@@ -234,7 +259,7 @@ commentThreadView : Model -> Html Msg
 commentThreadView model =
     model.commentThread
         |> Result.map (\cT -> div [] [ selectedCommentDetails cT, commentTreeView cT ])
-        |> Result.mapError (\error -> parseErrorDetails error)
+        |> Result.mapError (\error -> errorDetailsArea error)
         |> eitherFromResult
 
 view : Model -> Html Msg
@@ -242,7 +267,7 @@ view model =
     div
       []
       [ jsonInputTextArea model
-      , parseJsonButton
+      , parseJsonButton model
       , commentThreadView model
       ]
 

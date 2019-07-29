@@ -1,0 +1,22 @@
+{  "author": "Jane Doe",
+    "message": "I don't like this",
+    "uid": ["janedoe-thread-123", 0],
+    "responses": [
+      { "author": "John Deer",
+        "message": "What is it exactly you don't like?",
+        "uid": ["janedoe-thread-123", 1],
+        "responses" : [ {
+            "author": "Jane Doe",
+            "message": "None of it",
+            "uid": ["janedoe-thread-123", 2],
+            "responses": []
+          }
+        ]
+      },
+      { "author": "Jake Steer",
+        "message": "Me neither",
+        "uid": ["janedoe-thread-123", 3],
+        "responses": []
+      }
+    ]
+}

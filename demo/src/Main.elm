@@ -20,12 +20,16 @@ type alias Model =
 
 initModel : () -> (Model, Cmd Msg)
 initModel () =
-    ( { currentTab = 1
-      , simpleTreeModel = SimpleTreeTab.initialModel
-      , recursiveJsonTreeModel = RecursiveJsonTreeTab.initialModel
-      }
-    , Cmd.none
-    )
+    let
+        (recursiveJsonTreeModel, recursiveJsonTreeCmd) =
+            RecursiveJsonTreeTab.initializeModel
+    in
+        ( { currentTab = 1
+          , simpleTreeModel = SimpleTreeTab.initialModel
+          , recursiveJsonTreeModel = recursiveJsonTreeModel
+          }
+        , Cmd.map RecurseJsonTreeMsg recursiveJsonTreeCmd
+        )
 
 
 type Msg
@@ -48,9 +52,13 @@ update msg model =
             )
 
         RecurseJsonTreeMsg recurseJsonTreeMsg ->
-            ( { model | recursiveJsonTreeModel = RecursiveJsonTreeTab.update recurseJsonTreeMsg model.recursiveJsonTreeModel }
-            , Cmd.none
-            )
+            let
+                (recursiveJsonTreeModel, recursiveJsonTreeCmd) =
+                    RecursiveJsonTreeTab.update recurseJsonTreeMsg model.recursiveJsonTreeModel
+            in
+                ( { model | recursiveJsonTreeModel = recursiveJsonTreeModel }
+                , Cmd.map RecurseJsonTreeMsg recursiveJsonTreeCmd
+                )
 
 
 {-| A plain old record holding a couple of theme colors.
