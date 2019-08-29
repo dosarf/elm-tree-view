@@ -8,6 +8,7 @@ singleNodeTree : T.Node String
 singleNodeTree =
     T.Node { children = [], data = "single" }
 
+
 parentChildTree : T.Node String
 parentChildTree =
     T.Node
@@ -15,12 +16,14 @@ parentChildTree =
       , data = "parent"
       }
 
+
 twin1Tree : T.Node String
 twin1Tree =
     T.Node
       { children = []
       , data = "twin1"
       }
+
 
 twin2Tree : T.Node String
 twin2Tree =
@@ -40,6 +43,7 @@ parentTwoChildrenTree =
       , data = "parent2"
       }
 
+
 moreComplexTree : T.Node String
 moreComplexTree =
     T.Node
@@ -49,6 +53,20 @@ moreComplexTree =
           ]
       , data = "complex"
       }
+
+
+dataStringListOf : T.Node String -> List String
+dataStringListOf tree =
+    tree
+        |> T.listTreeNodes
+        |> List.map T.dataOf
+
+
+dataStringListOfForest : List (T.Node String) -> List String
+dataStringListOfForest forest =
+    forest
+        |> List.map dataStringListOf
+        |> List.concat
 
 
 testSuite =
@@ -173,5 +191,39 @@ testSuite =
                     , T.AnnotatedNode 4 1 singleNodeTree
                     ]
                         |> Expect.equal (T.listAnnotatedForestNodes [ parentTwoChildrenTree, parentChildTree ])
+            ]
+        , describe "updateTreeData tests"
+            [ test "single list node gets updated, if instructed" <|
+                \() ->
+                    [ "SINGLE" ]
+                        |> Expect.equal (T.updateTreeData (\_ -> True) (String.toUpper) singleNodeTree |> dataStringListOf)
+            , test "single list node does not get updated, if not instructed" <|
+                \() ->
+                    [ "single" ]
+                        |> Expect.equal (T.updateTreeData (\_ -> False) (String.toUpper) singleNodeTree |> dataStringListOf)
+            , test "one node can be singled out for updating" <|
+                \() ->
+                    [ "complex"
+                    , "parent"
+                    , "SINGLE"
+                    , "parent2"
+                    , "twin1"
+                    , "twin2"
+                    ]
+                        |> Expect.equal (T.updateTreeData (\s -> String.startsWith "s" s) (String.toUpper) moreComplexTree |> dataStringListOf)
+            ]
+        , describe "updateForestData tests"
+            [ test "nodes can be controlled for updating even for a forest" <|
+                \() ->
+                    [ "SINGLE"
+                    , "complex"
+                    , "parent"
+                    , "SINGLE"
+                    , "parent2"
+                    , "twin1"
+                    , "twin2"
+                    ]
+                        |> Expect.equal (T.updateForestData (\s -> String.startsWith "s" s) (String.toUpper) [singleNodeTree, moreComplexTree] |> dataStringListOfForest)
+
             ]
         ]

@@ -60,7 +60,7 @@ configuration =
     in
         TV.Configuration (nodeText >> TV.NodeUid) nodeText TV.defaultCssClasses
 
-initTreeViewModel : List (T.Node String) -> TV.Model String String
+initTreeViewModel : List (T.Node String) -> TV.Model String String Never
 initTreeViewModel nodes =
     TV.initializeModel configuration nodes
 

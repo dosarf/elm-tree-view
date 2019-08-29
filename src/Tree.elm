@@ -1,6 +1,7 @@
 module Tree exposing
   ( Node(..)
   , dataOf, childrenOf
+  , updateTreeData, updateForestData
   , FoldOptions, defaultFoldOptions, foldTree, foldForest
   , treeHeight, forestHeight
   , joinTree, joinForest
@@ -26,6 +27,9 @@ in left to right order.
 ## Getting stuff out of nodes
 
 @docs childrenOf, dataOf
+
+## Updating node data
+@docs updateTreeData, updateForestData
 
 ## More utility functions
 
@@ -65,6 +69,49 @@ childrenOf n =
     case n of
         Node node ->
             node.children
+
+
+{-| Updates data stored in the nodes of the tree, recursively.
+Leaves the structure of the tree intact.
+
+    tree : T.Node String
+    tree =
+        ... -- construct tree with single string as data on nodes
+
+    -- turn uppercase the strings starting with 's' in all nodes
+    updateTreeData
+        (\s -> String.startsWith "s" s)
+        (String.toUpper)
+        tree
+
+-}
+updateTreeData : (d -> Bool) -> (d -> d) -> Node d -> Node d
+updateTreeData select update tree =
+    let
+        children =
+            List.map (updateTreeData select update) (childrenOf tree)
+        currentData =
+            dataOf tree
+        data =
+            if select currentData then
+                update currentData
+            else
+                currentData
+    in
+        Node
+            { data = data
+            , children = children
+            }
+
+
+{-| Updates data stored in the nodes of the trees in a list, recursively.
+Very similar to [`updateTreeData`](#updateTreeData). Leaves the structure of
+the trees intact.
+-}
+updateForestData : (d -> Bool) -> (d -> d) -> List (Node d) -> List (Node d)
+updateForestData select update forest =
+    List.map (\n -> updateTreeData select update n) forest
+
 
 {-| Fold options to use with [`foldTree`](#foldTree) or [`foldForest`](#foldForest).
 

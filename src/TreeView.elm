@@ -3,8 +3,9 @@ module TreeView exposing
   , NodeUid(..), uidOf, Configuration
   , Model, initializeModel, Msg
   , update, view, subscriptions
-  , expandAll, collapseAll, getSelected, getVisibleAnnotatedNodes
+  , expandAll, collapseAll, updateNodeData, getSelected, getVisibleAnnotatedNodes
   , updateExpandedStateOf
+  , Configuration2, initializeModel2, Msg2 (..), update2, view2, subscriptions2
   )
 
 {-| Tree view facility.
@@ -35,7 +36,11 @@ as selected node and visible nodes can be retrieved.
 
 ## Working with tree views
 
-@docs getSelected, getVisibleAnnotatedNodes, expandAll, collapseAll, updateExpandedStateOf
+@docs getSelected, getVisibleAnnotatedNodes, expandAll, collapseAll, updateExpandedStateOf, updateNodeData
+
+## Custom rendering nodes
+
+@docs Configuration2, initializeModel2, Msg2, update2, view2, subscriptions2
 -}
 
 import List.Extra as LX
@@ -131,6 +136,22 @@ type alias Configuration d comparable =
     , cssClasses : CssClasses
     }
 
+
+{-| Similar to [`Configuration`](#Configuration) but this allows customer rendering of
+nodes instead of simple text representation. So instead of `labelThunk` you have
+
+    itemThunk : T.Node d -> Html customMsg
+
+that will turn a node into a bit of HTML, possibly
+with its own events. See [`Msg2`](#Msg2).`CustomMsg`, which will carry the custom
+messages coming out of the little HTML rendering of a node.
+-}
+type alias Configuration2 d comparable customMsg =
+    { uidThunk : T.Node d -> NodeUid comparable
+    , itemThunk : T.Node d -> Html customMsg
+    , cssClasses : CssClasses
+    }
+
 type Arrow =
     Left
     | Right
@@ -145,18 +166,17 @@ type alias Selection comparable =
 
 {- Internals of the model.
 -}
-type alias Guts d comparable =
+type alias Guts d comparable customMsg =
     {
     -- configuration
-    uidThunk : T.Node d -> NodeUid comparable
-    , labelThunk : (T.Node d) -> String
+      uidThunk : T.Node d -> NodeUid comparable
+    , labelThunk : T.Node d -> String
+    , itemThunk : T.Node d -> Html customMsg
     , cssClasses : CssClasses
 
-    -- data that is never updated
+    -- data that can be updated
     , forest : List (T.Node d)
     , annotatedNodes : List (T.AnnotatedNode d)
-
-    -- data that can be updated
     , collapsedNodeUids : Set.Set comparable
     , visibleAnnotatedNodes : List (T.AnnotatedNode d)
     , selection : Maybe (Selection comparable)
@@ -172,10 +192,10 @@ Type variables
 
 See [`initializeModel`](#initializeModel).
 -}
-type Model d comparable =
-    Model (Guts d comparable)
+type Model d comparable customMsg =
+    Model (Guts d comparable customMsg)
 
-gutsOf : Model d comparable -> Guts d comparable
+gutsOf : Model d comparable customMsg -> Guts d comparable customMsg
 gutsOf model =
     case model of
         Model guts ->
@@ -183,7 +203,7 @@ gutsOf model =
 
 {-| Initializes a model for a tree view.
 -}
-initializeModel : Configuration d comparable -> List (T.Node d) -> Model d comparable
+initializeModel : Configuration d comparable -> List (T.Node d) -> Model d comparable Never
 initializeModel configuration forest =
     let
         collapedNodeUids = Set.empty
@@ -193,6 +213,7 @@ initializeModel configuration forest =
             ( Guts
                   configuration.uidThunk
                   configuration.labelThunk
+                  (\_ -> text "")
                   configuration.cssClasses
                   forest
                   annotatedNodes
@@ -201,15 +222,55 @@ initializeModel configuration forest =
                   Nothing
             )
 
+
+{-| Just like [`initializeModel`](#initializeModel) only for tree views with
+custom rendered nodes.
+-}
+initializeModel2 : Configuration2 d comparable customMsg -> List (T.Node d) -> Model d comparable customMsg
+initializeModel2 configuration forest =
+    let
+        collapedNodeUids = Set.empty
+        annotatedNodes = T.listAnnotatedForestNodes forest
+    in
+        Model
+            ( Guts
+                  configuration.uidThunk
+                  (\_ -> "")
+                  configuration.itemThunk
+                  configuration.cssClasses
+                  forest
+                  annotatedNodes
+                  collapedNodeUids
+                  (calculateVisibleAnnotatedNodes configuration.uidThunk collapedNodeUids annotatedNodes)
+                  Nothing
+            )
+
+
 {-| Message, carrying the uid of the node something happened to.
 -}
-type Msg comparable =
-    Expand (NodeUid comparable)
+type Msg comparable
+    = Expand (NodeUid comparable)
     | Collapse (NodeUid comparable)
     | Select (NodeUid comparable)
     | ArrowDirection Arrow
 
-modelWithNewExpansionStates : Set.Set comparable -> Model d comparable -> Model d comparable
+
+{-| The type of messages emitted by tree views with custom rendered nodes.
+
+* Enum `Internal` carries the type of internal [`Msg`](#Msg) messages that
+make the tree view work itself. These you feed back to [`update2`](#update2)
+just like with any old message,
+
+* Enum `CustomMsg` carries the custom messages emitted by the HTML fragments
+that nodes got rendered into. These are the messages that you want to process
+yourself. E.g. every node may have a button that can be clicked.
+-}
+type Msg2 comparable customMsg
+    = Internal (Msg comparable)
+    | CustomMsg customMsg
+
+
+modelWithNewExpansionStates : Set.Set comparable -> Model d comparable customMsg -> Model d comparable customMsg
 modelWithNewExpansionStates collapsedNodeUids model =
     let
         guts = gutsOf model
@@ -233,10 +294,11 @@ modelWithNewExpansionStates collapsedNodeUids model =
               , selection = selection
             }
 
+
 {-| Updates the model by setting the epxansion state of a node, identified by its
 node uid. `True` will expand the node, `False` will collapse it.
 -}
-updateExpandedStateOf : NodeUid comparable -> Bool -> Model d comparable -> Model d comparable
+updateExpandedStateOf : NodeUid comparable -> Bool -> Model d comparable customMsg -> Model d comparable customMsg
 updateExpandedStateOf nodeUid expanded model =
     let
         guts = gutsOf model
@@ -248,15 +310,17 @@ updateExpandedStateOf nodeUid expanded model =
     in
         modelWithNewExpansionStates collapsedNodeUids model
 
+
 {-| Expands all nodes.
 -}
-expandAll : Model d comparable -> Model d comparable
+expandAll : Model d comparable customMsg -> Model d comparable customMsg
 expandAll model =
     modelWithNewExpansionStates Set.empty model
 
+
 {-| Collapses all nodes.
 -}
-collapseAll : Model d comparable -> Model d comparable
+collapseAll : Model d comparable customMsg -> Model d comparable customMsg
 collapseAll model =
     let
         guts = gutsOf model
@@ -268,9 +332,30 @@ collapseAll model =
     in
         modelWithNewExpansionStates collapsedNodeUids model
 
+
+{-| Updates the data of selected nodes, similar to
+[`Tree.updateTreeData`](Tree#updateTreeData). Also updates other bookkeeping
+related to the tree view.
+-}
+updateNodeData : (d -> Bool) -> (d -> d) -> Model d comparable customMsg -> Model d comparable customMsg
+updateNodeData selector updater model =
+    let
+        guts =
+            gutsOf model
+        forest =
+            T.updateForestData selector updater guts.forest
+    in
+        Model
+            { guts
+            | forest = forest
+            , annotatedNodes = T.listAnnotatedForestNodes forest
+            }
+            |> modelWithNewExpansionStates guts.collapsedNodeUids
+
+
 {-| Gets the selected (annotated) node, if any. See [`AnnotatedNode`](Tree#AnnotatedNode).
 -}
-getSelected : Model d comparable -> Maybe (T.AnnotatedNode d)
+getSelected : Model d comparable customMsg -> Maybe (T.AnnotatedNode d)
 getSelected model =
     let
         guts = gutsOf model
@@ -278,16 +363,18 @@ getSelected model =
         Maybe.map .index guts.selection
           |> Maybe.andThen (\index -> LX.getAt index guts.visibleAnnotatedNodes)
 
+
 {-| Gets the currently visible nodes (annotated). See [`AnnotatedNode`](Tree#AnnotatedNode).
 
 Collapsing a non-leaf node will make its children hidden, transitively. The
 remaining visible nodes are the ones navigated with the up/down arrow keys.
 -}
-getVisibleAnnotatedNodes : Model d comparable -> List (T.AnnotatedNode d)
+getVisibleAnnotatedNodes : Model d comparable customMsg -> List (T.AnnotatedNode d)
 getVisibleAnnotatedNodes model =
     gutsOf model |> .visibleAnnotatedNodes
 
-stepSelection : Int -> Model d comparable -> Model d comparable
+
+stepSelection : Int -> Model d comparable customMsg -> Model d comparable customMsg
 stepSelection direction model =
     let
         guts = gutsOf model
@@ -306,6 +393,7 @@ stepSelection direction model =
             Just nodeUid ->
                 Model { guts | selection = Just <| Selection newSelectionIndex nodeUid }
 
+
 findAnnotatedNodeIndex : (T.Node d -> NodeUid comparable) -> NodeUid comparable -> List (T.AnnotatedNode d) -> Maybe Int
 findAnnotatedNodeIndex uidThunk nodeUid annotatedNodes =
     let
@@ -313,7 +401,8 @@ findAnnotatedNodeIndex uidThunk nodeUid annotatedNodes =
     in
         LX.findIndex (\annotatedNode -> uidOf (uidThunk annotatedNode.node) == actualNodeUid) annotatedNodes
 
-setSelectionTo : NodeUid comparable -> Model d comparable -> Model d comparable
+
+setSelectionTo : NodeUid comparable -> Model d comparable customMsg -> Model d comparable customMsg
 setSelectionTo nodeUid model =
     let
         guts = gutsOf model
@@ -325,9 +414,10 @@ setSelectionTo nodeUid model =
             Just visibleIndex ->
                 Model { guts | selection = Just <| Selection visibleIndex nodeUid }
 
+
 {-| Updates the tree view model according to the message.
 -}
-update : Msg comparable -> Model d comparable -> Model d comparable
+update : Msg comparable -> Model d comparable customMsg -> Model d comparable customMsg
 update message model =
     case message of
         Expand nodeUid ->
@@ -357,9 +447,24 @@ update message model =
                 _ ->
                     model
 
+
+{-| Just like [`update`](#update) only for tree views with
+custom rendered nodes.
+-}
+update2 : Msg2 comparable customMsg -> Model d comparable customMsg -> Model d comparable customMsg
+update2 msg model =
+    case msg of
+        Internal internalMsg ->
+            update internalMsg model
+
+        CustomMsg _ ->
+            model
+
+
 keyDownDecoder : JsonDec.Decoder (Msg comparable)
 keyDownDecoder =
     JsonDec.map toArrowDirection (JsonDec.field "key" JsonDec.string)
+
 
 toArrowDirection : String -> (Msg comparable)
 toArrowDirection string =
@@ -383,37 +488,72 @@ toArrowDirection string =
 * selection navigation (up / down arrows),
 * collapse & expand action ( left / right arrows).
 -}
-subscriptions : Model d comparable -> Sub (Msg comparable)
+subscriptions : Model d comparable customMsg -> Sub (Msg comparable)
 subscriptions model =
     Events.onKeyDown keyDownDecoder
 
-modelHeight : Model d comparable -> Int
+
+{-| Just like [`subscriptions`](#subscription) only for tree views with
+custom rendered nodes.
+-}
+subscriptions2 : Model d comparable customMsg -> Sub (Msg2 comparable customMsg)
+subscriptions2 model =
+    Sub.map Internal <| Events.onKeyDown keyDownDecoder
+
+
+modelHeight : Model d comparable customMsg -> Int
 modelHeight model =
     T.forestHeight (gutsOf model |> .forest)
 
 
 {-| Render the tree view model into HTML.
 -}
-view : Model d comparable -> Html (Msg comparable)
+view : Model d comparable customMsg  -> Html (Msg comparable)
 view model =
     let
         guts = gutsOf model
         height = modelHeight model
     in
-    div
-        []
-        [ table
-            [ class guts.cssClasses.treeViewCssClass ]
-            (tableRowsForNodes height model)
-        ]
+        div
+            []
+            [ table
+                [ class guts.cssClasses.treeViewCssClass ]
+                (tableRowsForNodes height model)
+            ]
 
 
-tableRowsForNodes : Int -> Model d comparable -> List (Html (Msg comparable))
+{-| Just like [`view`](#view) only for tree views with
+custom rendered nodes.
+-}
+view2 : Model d comparable customMsg -> Html (Msg2 comparable customMsg)
+view2 model =
+    let
+        guts = gutsOf model
+        height = modelHeight model
+    in
+        div
+            []
+            [ table
+                [ class guts.cssClasses.treeViewCssClass ]
+                (tableRowsForNodes2 height model)
+            ]
+
+
+tableRowsForNodes : Int -> Model d comparable customMsg -> List (Html (Msg comparable))
 tableRowsForNodes height model =
     let
         guts = gutsOf model
     in
         List.map (\annotatedNode -> tableRowForNode height model annotatedNode) guts.visibleAnnotatedNodes
+
+
+tableRowsForNodes2 : Int -> Model d comparable customMsg -> List (Html (Msg2 comparable customMsg))
+tableRowsForNodes2 height model =
+    let
+        guts = gutsOf model
+    in
+        List.map (\annotatedNode -> tableRowForNode2 height model annotatedNode) guts.visibleAnnotatedNodes
+
 
 calculateVisibleAnnotatedNodes : (T.Node d -> NodeUid comparable) -> Set.Set comparable -> List (T.AnnotatedNode d) -> List (T.AnnotatedNode d)
 calculateVisibleAnnotatedNodes uidThunk collapsedNodeUids annotatedNodes =
@@ -442,16 +582,19 @@ calculateVisibleAnnotatedNodes uidThunk collapsedNodeUids annotatedNodes =
     in
         List.foldl visibilityFoldThunk (Nothing, []) annotatedNodes |> Tuple.second
 
+
 type ExpansionState =
     Leaf
     | Expanded
     | Collapsed
 
+
 isLeaf : T.AnnotatedNode d -> Bool
 isLeaf annotatedNode =
     List.isEmpty <| T.childrenOf annotatedNode.node
 
-expansionStateOf : T.AnnotatedNode d -> Model d comparable -> ExpansionState
+
+expansionStateOf : T.AnnotatedNode d -> Model d comparable customMsg -> ExpansionState
 expansionStateOf annotatedNode model =
     if (isLeaf annotatedNode) then
         Leaf
@@ -464,6 +607,7 @@ expansionStateOf annotatedNode model =
                 Collapsed
             else
                 Expanded
+
 
 bulletTd : ExpansionState -> NodeUid comparable -> CssClasses -> Html (Msg comparable)
 bulletTd expansionState nodeUid cssClasses =
@@ -497,7 +641,8 @@ bulletTd expansionState nodeUid cssClasses =
             attributes
             [ htmlContent ]
 
-nodeTdAttributes : Int -> NodeUid comparable -> Model d comparable -> List (Attribute (Msg comparable))
+
+nodeTdAttributes : Int -> NodeUid comparable -> Model d comparable customMsg -> List (Attribute msg)
 nodeTdAttributes colSpan nodeUid model =
     let
         guts = gutsOf model
@@ -511,14 +656,16 @@ nodeTdAttributes colSpan nodeUid model =
         , colspan colSpan
         ]
 
-tableRowForNode : Int -> Model d comparable -> T.AnnotatedNode d -> Html (Msg comparable)
+
+tableRowForNode : Int -> Model d comparable customMsg -> T.AnnotatedNode d -> Html (Msg comparable)
 tableRowForNode height model annotatedNode =
     let
         guts = gutsOf model
         level = annotatedNode.level
         indentation = nBlankCells guts.cssClasses level
+        bullet = bulletTd expansionState nodeUid guts.cssClasses
         levelsLeft = height - level
-        nodeText = guts.labelThunk <| annotatedNode.node
+        nodeItem = text <| guts.labelThunk annotatedNode.node
         nodeUid = guts.uidThunk <| annotatedNode.node
         expansionState = expansionStateOf annotatedNode model
         renderedNodeTd =
@@ -527,14 +674,44 @@ tableRowForNode height model annotatedNode =
                 [ label
                     [ onClick (Select nodeUid)
                     ]
-                    [ text nodeText ]
+                    [ nodeItem ]
                 ]
     in
         tr
             [ class guts.cssClasses.treeViewCssClass ]
             ( indentation
-              ++ [ bulletTd expansionState nodeUid guts.cssClasses ]
-              ++ [ renderedNodeTd ]
+              ++ [ bullet
+                , renderedNodeTd
+                ]
+            )
+
+
+tableRowForNode2 : Int -> Model d comparable customMsg -> T.AnnotatedNode d -> Html (Msg2 comparable customMsg)
+tableRowForNode2 height model annotatedNode =
+    let
+        guts = gutsOf model
+        level = annotatedNode.level
+        indentation = List.map (Html.map Internal) <| nBlankCells guts.cssClasses level
+        bullet = Html.map Internal <| bulletTd expansionState nodeUid guts.cssClasses
+        levelsLeft = height - level
+        nodeItem = Html.map CustomMsg <| guts.itemThunk annotatedNode.node
+        nodeUid = guts.uidThunk <| annotatedNode.node
+        expansionState = expansionStateOf annotatedNode model
+        renderedNodeTd =
+            td
+                (nodeTdAttributes levelsLeft nodeUid model)
+                [ label
+                    [ onClick <| Internal (Select nodeUid)
+                    ]
+                    [ nodeItem ]
+                ]
+    in
+        tr
+            [ class guts.cssClasses.treeViewCssClass ]
+            ( indentation
+              ++ [ bullet
+                , renderedNodeTd
+                ]
             )
 
 
