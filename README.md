@@ -63,7 +63,7 @@ view, like
 it should build and behave the same (nodes rendered as simple texts).
 
 To go for custom node rendering, use the new types and functions with the
-prefix `2`, like [`TreeView.Configuration2`](TreeView#Configuration2),
+suffix `2`, like [`TreeView.Configuration2`](TreeView#Configuration2),
 [`TreeView.initializeModel2`](TreeView#initializeModel2), etc ...
 
 ### 1.x
