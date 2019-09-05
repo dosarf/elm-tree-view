@@ -16,13 +16,13 @@ import Mwc.TextField
 -}
 type alias NodeData =
     { uid : String
-    , label : String -- TODO rename to content
+    , content : String
     }
 
 
 initNodeData : String -> String -> NodeData
-initNodeData uid label =
-    NodeData uid label
+initNodeData uid content =
+    NodeData uid content
 
 
 type NodeDataMsg
@@ -34,7 +34,7 @@ updateNodeData msg nodeData =
     case msg of
         EditContent uid content ->
             if nodeData.uid == uid then
-                { nodeData | label = content }
+                { nodeData | content = content }
 
             else
                 nodeData
@@ -54,13 +54,13 @@ viewNodeData selectedNode node =
             input
                 [ onInput <| EditContent nodeData.uid
                 , type_ "text"
-                , value nodeData.label
+                , value nodeData.content
                 ]
                 []
                 |> toUnstyled
 
         else
-            text nodeData.label
+            text nodeData.content
                 |> toUnstyled
 
 
@@ -160,7 +160,7 @@ setNodeContent : String -> String -> TV.Model NodeData String NodeDataMsg (Maybe
 setNodeContent nodeUid content treeModel =
     TV.updateNodeData
         (\nodeData -> nodeData.uid == nodeUid)
-        (\nodeData -> { nodeData | label = content })
+        (\nodeData -> { nodeData | content = content })
         treeModel
 
 
@@ -184,7 +184,7 @@ selectedNodeDetails : Model -> Html Msg
 selectedNodeDetails model =
     let
         selectedDetails =
-            Maybe.map (\nodeData -> nodeData.uid ++ ": " ++ nodeData.label) model.selectedNode
+            Maybe.map (\nodeData -> nodeData.uid ++ ": " ++ nodeData.content) model.selectedNode
                 |> Maybe.withDefault "(nothing selected)"
     in
         div
