@@ -17,13 +17,12 @@ import Mwc.TextField
 type alias NodeData =
     { uid : String
     , label : String -- TODO rename to content
-    , editing : Bool
     }
 
 
 initNodeData : String -> String -> NodeData
 initNodeData uid label =
-    NodeData uid label False
+    NodeData uid label
 
 
 type NodeDataMsg
@@ -41,13 +40,17 @@ updateNodeData msg nodeData =
                 nodeData
 
 
-viewNodeData : () -> T.Node NodeData -> Html.Html NodeDataMsg
-viewNodeData () node =
+viewNodeData : Maybe NodeData -> T.Node NodeData -> Html.Html NodeDataMsg
+viewNodeData selectedNode node =
     let
         nodeData =
             T.dataOf node
+        selected =
+            selectedNode
+                |> Maybe.map (\sN -> nodeData.uid == sN.uid)
+                |> Maybe.withDefault False
     in
-        if nodeData.editing then
+        if selected then
             input
                 [ onInput <| EditContent nodeData.uid
                 , type_ "text"
@@ -72,12 +75,12 @@ nodeUidOf n =
 -}
 type alias Model =
     { rootNodes : List (T.Node NodeData)
-    , treeModel : TV.Model NodeData String NodeDataMsg () -- TODO simplify selection by not storing selected in node, have it as app-state cookie
+    , treeModel : TV.Model NodeData String NodeDataMsg (Maybe NodeData)
     , selectedNode : Maybe NodeData
     }
 
 
-configuration : TV.Configuration2 NodeData String NodeDataMsg ()
+configuration : TV.Configuration2 NodeData String NodeDataMsg (Maybe NodeData)
 configuration =
     TV.Configuration2 nodeUidOf viewNodeData TV.defaultCssClasses
 
@@ -148,43 +151,17 @@ update message model =
 
     in
         { model
-        | treeModel = toggleEditable model.selectedNode selectedNode treeModel
+        | treeModel = treeModel
         , selectedNode = selectedNode
         }
 
 
-setNodeContent : String -> String -> TV.Model NodeData String NodeDataMsg () -> TV.Model NodeData String NodeDataMsg ()
+setNodeContent : String -> String -> TV.Model NodeData String NodeDataMsg (Maybe NodeData) -> TV.Model NodeData String NodeDataMsg (Maybe NodeData)
 setNodeContent nodeUid content treeModel =
     TV.updateNodeData
         (\nodeData -> nodeData.uid == nodeUid)
         (\nodeData -> { nodeData | label = content })
         treeModel
-
-
-areSameNodes : NodeData -> NodeData -> Bool
-areSameNodes nodeData1 nodeData2 =
-    nodeData1.uid == nodeData2.uid
-
-
-{- Turns the previously selected node non-editable, and the newly selected to be
-editable.
--}
-toggleEditable : Maybe NodeData -> Maybe NodeData -> TV.Model NodeData String NodeDataMsg () -> TV.Model NodeData String NodeDataMsg ()
-toggleEditable currentlySelected nextSelected treeModel =
-    let
-        isNodeCurrentlySelected =
-            currentlySelected
-                |> Maybe.map (\cS -> areSameNodes cS)
-                |> Maybe.withDefault (\_ -> False)
-        isNodeNextSelected =
-            nextSelected
-                |> Maybe.map (\nS -> areSameNodes nS)
-                |> Maybe.withDefault (\_ -> False)
-    in
-        TV.updateNodeData
-            (\nodeData -> isNodeCurrentlySelected nodeData || isNodeNextSelected nodeData)
-            (\nodeData -> { nodeData | editing = isNodeNextSelected nodeData })
-            treeModel
 
 
 expandAllCollapseAllButtons : Html Msg
@@ -224,7 +201,7 @@ view model =
       []
       [ expandAllCollapseAllButtons
       , selectedNodeDetails model
-      , map TreeViewMsg (TV.view2 () model.treeModel |> fromUnstyled)
+      , map TreeViewMsg (TV.view2 model.selectedNode model.treeModel |> fromUnstyled)
       ]
 
 
