@@ -64,7 +64,7 @@ commentToTree comment =
             }
 
 type alias CommentThread =
-    { treeViewModel : TV.Model CommentData CommentUid Never
+    { treeViewModel : TV.Model CommentData CommentUid Never ()
     , selectedComment : Maybe CommentData
     , treeViewActive : Bool
     }

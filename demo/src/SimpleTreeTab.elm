@@ -15,7 +15,7 @@ type alias NodeData =
 
 type alias Model =
     { rootNodes : List (T.Node NodeData)
-    , treeModel : TV.Model NodeData String Never
+    , treeModel : TV.Model NodeData String Never ()
     , selectedNode : Maybe NodeData
     }
 

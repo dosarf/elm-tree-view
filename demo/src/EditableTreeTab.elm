@@ -41,8 +41,8 @@ updateNodeData msg nodeData =
                 nodeData
 
 
-viewNodeData : T.Node NodeData -> Html.Html NodeDataMsg
-viewNodeData node =
+viewNodeData : () -> T.Node NodeData -> Html.Html NodeDataMsg
+viewNodeData () node =
     let
         nodeData =
             T.dataOf node
@@ -72,12 +72,12 @@ nodeUidOf n =
 -}
 type alias Model =
     { rootNodes : List (T.Node NodeData)
-    , treeModel : TV.Model NodeData String NodeDataMsg
+    , treeModel : TV.Model NodeData String NodeDataMsg () -- TODO simplify selection by not storing selected in node, have it as app-state cookie
     , selectedNode : Maybe NodeData
     }
 
 
-configuration : TV.Configuration2 NodeData String NodeDataMsg
+configuration : TV.Configuration2 NodeData String NodeDataMsg ()
 configuration =
     TV.Configuration2 nodeUidOf viewNodeData TV.defaultCssClasses
 
@@ -153,7 +153,7 @@ update message model =
         }
 
 
-setNodeContent : String -> String -> TV.Model NodeData String NodeDataMsg -> TV.Model NodeData String NodeDataMsg
+setNodeContent : String -> String -> TV.Model NodeData String NodeDataMsg () -> TV.Model NodeData String NodeDataMsg ()
 setNodeContent nodeUid content treeModel =
     TV.updateNodeData
         (\nodeData -> nodeData.uid == nodeUid)
@@ -169,7 +169,7 @@ areSameNodes nodeData1 nodeData2 =
 {- Turns the previously selected node non-editable, and the newly selected to be
 editable.
 -}
-toggleEditable : Maybe NodeData -> Maybe NodeData -> TV.Model NodeData String NodeDataMsg -> TV.Model NodeData String NodeDataMsg
+toggleEditable : Maybe NodeData -> Maybe NodeData -> TV.Model NodeData String NodeDataMsg () -> TV.Model NodeData String NodeDataMsg ()
 toggleEditable currentlySelected nextSelected treeModel =
     let
         isNodeCurrentlySelected =
@@ -224,7 +224,7 @@ view model =
       []
       [ expandAllCollapseAllButtons
       , selectedNodeDetails model
-      , map TreeViewMsg (TV.view2 model.treeModel |> fromUnstyled)
+      , map TreeViewMsg (TV.view2 () model.treeModel |> fromUnstyled)
       ]
 
 

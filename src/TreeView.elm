@@ -140,15 +140,21 @@ type alias Configuration d comparable =
 {-| Similar to [`Configuration`](#Configuration) but this allows customer rendering of
 nodes instead of simple text representation. So instead of `labelThunk` you have
 
-    itemThunk : T.Node d -> Html customMsg
+    itemThunk : cookie -> T.Node d -> Html customMsg
 
-that will turn a node into a bit of HTML, possibly
+that will turn a node (and a cookie of your choice) into a bit of HTML, possibly
 with its own events. See [`Msg2`](#Msg2).`CustomMsg`, which will carry the custom
 messages coming out of the little HTML rendering of a node.
+
+Cookie is for handing down some state that you wish to maintain outside nodes,
+to node rendering. E.g. you want some check box for each node to mark whether it's
+selected or not. That selection state may be modeled and stored within a node,
+but it might be easier to store the set of selected node (uids) outside the tree
+as well.
 -}
-type alias Configuration2 d comparable customMsg =
+type alias Configuration2 d comparable customMsg cookie =
     { uidThunk : T.Node d -> NodeUid comparable
-    , itemThunk : T.Node d -> Html customMsg
+    , itemThunk : cookie -> T.Node d -> Html customMsg
     , cssClasses : CssClasses
     }
 
@@ -166,12 +172,12 @@ type alias Selection comparable =
 
 {- Internals of the model.
 -}
-type alias Guts d comparable customMsg =
+type alias Guts d comparable customMsg cookie =
     {
     -- configuration
       uidThunk : T.Node d -> NodeUid comparable
     , labelThunk : T.Node d -> String
-    , itemThunk : T.Node d -> Html customMsg
+    , itemThunk : cookie -> T.Node d -> Html customMsg
     , cssClasses : CssClasses
 
     -- data that can be updated
@@ -192,10 +198,10 @@ Type variables
 
 See [`initializeModel`](#initializeModel).
 -}
-type Model d comparable customMsg =
-    Model (Guts d comparable customMsg)
+type Model d comparable customMsg cookie =
+    Model (Guts d comparable customMsg cookie)
 
-gutsOf : Model d comparable customMsg -> Guts d comparable customMsg
+gutsOf : Model d comparable customMsg cookie -> Guts d comparable customMsg cookie
 gutsOf model =
     case model of
         Model guts ->
@@ -203,7 +209,7 @@ gutsOf model =
 
 {-| Initializes a model for a tree view.
 -}
-initializeModel : Configuration d comparable -> List (T.Node d) -> Model d comparable Never
+initializeModel : Configuration d comparable -> List (T.Node d) -> Model d comparable Never ()
 initializeModel configuration forest =
     let
         collapedNodeUids = Set.empty
@@ -213,7 +219,7 @@ initializeModel configuration forest =
             ( Guts
                   configuration.uidThunk
                   configuration.labelThunk
-                  (\_ -> text "")
+                  (\() node -> text <| configuration.labelThunk node)
                   configuration.cssClasses
                   forest
                   annotatedNodes
@@ -226,7 +232,7 @@ initializeModel configuration forest =
 {-| Just like [`initializeModel`](#initializeModel) only for tree views with
 custom rendered nodes.
 -}
-initializeModel2 : Configuration2 d comparable customMsg -> List (T.Node d) -> Model d comparable customMsg
+initializeModel2 : Configuration2 d comparable customMsg cookie -> List (T.Node d) -> Model d comparable customMsg cookie
 initializeModel2 configuration forest =
     let
         collapedNodeUids = Set.empty
@@ -270,7 +276,7 @@ type Msg2 comparable customMsg
     | CustomMsg customMsg
 
 
-modelWithNewExpansionStates : Set.Set comparable -> Model d comparable customMsg -> Model d comparable customMsg
+modelWithNewExpansionStates : Set.Set comparable -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 modelWithNewExpansionStates collapsedNodeUids model =
     let
         guts = gutsOf model
@@ -298,7 +304,7 @@ modelWithNewExpansionStates collapsedNodeUids model =
 {-| Updates the model by setting the epxansion state of a node, identified by its
 node uid. `True` will expand the node, `False` will collapse it.
 -}
-updateExpandedStateOf : NodeUid comparable -> Bool -> Model d comparable customMsg -> Model d comparable customMsg
+updateExpandedStateOf : NodeUid comparable -> Bool -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 updateExpandedStateOf nodeUid expanded model =
     let
         guts = gutsOf model
@@ -313,14 +319,14 @@ updateExpandedStateOf nodeUid expanded model =
 
 {-| Expands all nodes.
 -}
-expandAll : Model d comparable customMsg -> Model d comparable customMsg
+expandAll : Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 expandAll model =
     modelWithNewExpansionStates Set.empty model
 
 
 {-| Collapses all nodes.
 -}
-collapseAll : Model d comparable customMsg -> Model d comparable customMsg
+collapseAll : Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 collapseAll model =
     let
         guts = gutsOf model
@@ -337,7 +343,7 @@ collapseAll model =
 [`Tree.updateTreeData`](Tree#updateTreeData). Also updates other bookkeeping
 related to the tree view.
 -}
-updateNodeData : (d -> Bool) -> (d -> d) -> Model d comparable customMsg -> Model d comparable customMsg
+updateNodeData : (d -> Bool) -> (d -> d) -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 updateNodeData selector updater model =
     let
         guts =
@@ -355,7 +361,7 @@ updateNodeData selector updater model =
 
 {-| Gets the selected (annotated) node, if any. See [`AnnotatedNode`](Tree#AnnotatedNode).
 -}
-getSelected : Model d comparable customMsg -> Maybe (T.AnnotatedNode d)
+getSelected : Model d comparable customMsg cookie -> Maybe (T.AnnotatedNode d)
 getSelected model =
     let
         guts = gutsOf model
@@ -369,12 +375,12 @@ getSelected model =
 Collapsing a non-leaf node will make its children hidden, transitively. The
 remaining visible nodes are the ones navigated with the up/down arrow keys.
 -}
-getVisibleAnnotatedNodes : Model d comparable customMsg -> List (T.AnnotatedNode d)
+getVisibleAnnotatedNodes : Model d comparable customMsg cookie -> List (T.AnnotatedNode d)
 getVisibleAnnotatedNodes model =
     gutsOf model |> .visibleAnnotatedNodes
 
 
-stepSelection : Int -> Model d comparable customMsg -> Model d comparable customMsg
+stepSelection : Int -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 stepSelection direction model =
     let
         guts = gutsOf model
@@ -402,7 +408,7 @@ findAnnotatedNodeIndex uidThunk nodeUid annotatedNodes =
         LX.findIndex (\annotatedNode -> uidOf (uidThunk annotatedNode.node) == actualNodeUid) annotatedNodes
 
 
-setSelectionTo : NodeUid comparable -> Model d comparable customMsg -> Model d comparable customMsg
+setSelectionTo : NodeUid comparable -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 setSelectionTo nodeUid model =
     let
         guts = gutsOf model
@@ -417,7 +423,7 @@ setSelectionTo nodeUid model =
 
 {-| Updates the tree view model according to the message.
 -}
-update : Msg comparable -> Model d comparable customMsg -> Model d comparable customMsg
+update : Msg comparable -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 update message model =
     case message of
         Expand nodeUid ->
@@ -451,7 +457,7 @@ update message model =
 {-| Just like [`update`](#update) only for tree views with
 custom rendered nodes.
 -}
-update2 : Msg2 comparable customMsg -> Model d comparable customMsg -> Model d comparable customMsg
+update2 : Msg2 comparable customMsg -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 update2 msg model =
     case msg of
         Internal internalMsg ->
@@ -488,7 +494,7 @@ toArrowDirection string =
 * selection navigation (up / down arrows),
 * collapse & expand action ( left / right arrows).
 -}
-subscriptions : Model d comparable customMsg -> Sub (Msg comparable)
+subscriptions : Model d comparable customMsg cookie -> Sub (Msg comparable)
 subscriptions model =
     Events.onKeyDown keyDownDecoder
 
@@ -496,19 +502,19 @@ subscriptions model =
 {-| Just like [`subscriptions`](#subscription) only for tree views with
 custom rendered nodes.
 -}
-subscriptions2 : Model d comparable customMsg -> Sub (Msg2 comparable customMsg)
+subscriptions2 : Model d comparable customMsg cookie -> Sub (Msg2 comparable customMsg)
 subscriptions2 model =
     Sub.map Internal <| Events.onKeyDown keyDownDecoder
 
 
-modelHeight : Model d comparable customMsg -> Int
+modelHeight : Model d comparable customMsg cookie -> Int
 modelHeight model =
     T.forestHeight (gutsOf model |> .forest)
 
 
 {-| Render the tree view model into HTML.
 -}
-view : Model d comparable customMsg  -> Html (Msg comparable)
+view : Model d comparable customMsg cookie -> Html (Msg comparable)
 view model =
     let
         guts = gutsOf model
@@ -525,8 +531,8 @@ view model =
 {-| Just like [`view`](#view) only for tree views with
 custom rendered nodes.
 -}
-view2 : Model d comparable customMsg -> Html (Msg2 comparable customMsg)
-view2 model =
+view2 : cookie -> Model d comparable customMsg cookie -> Html (Msg2 comparable customMsg)
+view2 cookie model =
     let
         guts = gutsOf model
         height = modelHeight model
@@ -535,11 +541,11 @@ view2 model =
             []
             [ table
                 [ class guts.cssClasses.treeViewCssClass ]
-                (tableRowsForNodes2 height model)
+                (tableRowsForNodes2 cookie height model)
             ]
 
 
-tableRowsForNodes : Int -> Model d comparable customMsg -> List (Html (Msg comparable))
+tableRowsForNodes : Int -> Model d comparable customMsg cookie -> List (Html (Msg comparable))
 tableRowsForNodes height model =
     let
         guts = gutsOf model
@@ -547,12 +553,12 @@ tableRowsForNodes height model =
         List.map (\annotatedNode -> tableRowForNode height model annotatedNode) guts.visibleAnnotatedNodes
 
 
-tableRowsForNodes2 : Int -> Model d comparable customMsg -> List (Html (Msg2 comparable customMsg))
-tableRowsForNodes2 height model =
+tableRowsForNodes2 : cookie -> Int -> Model d comparable customMsg cookie -> List (Html (Msg2 comparable customMsg))
+tableRowsForNodes2 cookie height model =
     let
         guts = gutsOf model
     in
-        List.map (\annotatedNode -> tableRowForNode2 height model annotatedNode) guts.visibleAnnotatedNodes
+        List.map (\annotatedNode -> tableRowForNode2 cookie height model annotatedNode) guts.visibleAnnotatedNodes
 
 
 calculateVisibleAnnotatedNodes : (T.Node d -> NodeUid comparable) -> Set.Set comparable -> List (T.AnnotatedNode d) -> List (T.AnnotatedNode d)
@@ -594,7 +600,7 @@ isLeaf annotatedNode =
     List.isEmpty <| T.childrenOf annotatedNode.node
 
 
-expansionStateOf : T.AnnotatedNode d -> Model d comparable customMsg -> ExpansionState
+expansionStateOf : T.AnnotatedNode d -> Model d comparable customMsg cookie -> ExpansionState
 expansionStateOf annotatedNode model =
     if (isLeaf annotatedNode) then
         Leaf
@@ -642,7 +648,7 @@ bulletTd expansionState nodeUid cssClasses =
             [ htmlContent ]
 
 
-nodeTdAttributes : Int -> NodeUid comparable -> Model d comparable customMsg -> List (Attribute msg)
+nodeTdAttributes : Int -> NodeUid comparable -> Model d comparable customMsg cookie -> List (Attribute msg)
 nodeTdAttributes colSpan nodeUid model =
     let
         guts = gutsOf model
@@ -657,7 +663,7 @@ nodeTdAttributes colSpan nodeUid model =
         ]
 
 
-tableRowForNode : Int -> Model d comparable customMsg -> T.AnnotatedNode d -> Html (Msg comparable)
+tableRowForNode : Int -> Model d comparable customMsg cookie -> T.AnnotatedNode d -> Html (Msg comparable)
 tableRowForNode height model annotatedNode =
     let
         guts = gutsOf model
@@ -686,15 +692,15 @@ tableRowForNode height model annotatedNode =
             )
 
 
-tableRowForNode2 : Int -> Model d comparable customMsg -> T.AnnotatedNode d -> Html (Msg2 comparable customMsg)
-tableRowForNode2 height model annotatedNode =
+tableRowForNode2 : cookie -> Int -> Model d comparable customMsg cookie -> T.AnnotatedNode d -> Html (Msg2 comparable customMsg)
+tableRowForNode2 cookie height model annotatedNode =
     let
         guts = gutsOf model
         level = annotatedNode.level
         indentation = List.map (Html.map Internal) <| nBlankCells guts.cssClasses level
         bullet = Html.map Internal <| bulletTd expansionState nodeUid guts.cssClasses
         levelsLeft = height - level
-        nodeItem = Html.map CustomMsg <| guts.itemThunk annotatedNode.node
+        nodeItem = Html.map CustomMsg <| guts.itemThunk cookie annotatedNode.node
         nodeUid = guts.uidThunk <| annotatedNode.node
         expansionState = expansionStateOf annotatedNode model
         renderedNodeTd =
