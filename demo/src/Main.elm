@@ -7,6 +7,7 @@ import Html.Styled.Attributes exposing (css, href, src)
 import SimpleTreeTab
 import RecursiveJsonTreeTab
 import EditableTreeTab
+import SearchableTreeTab
 import Mwc.Button
 import Mwc.Tabs
 import Mwc.TextField
@@ -17,6 +18,7 @@ type alias Model =
     , simpleTreeModel : SimpleTreeTab.Model
     , recursiveJsonTreeModel : RecursiveJsonTreeTab.Model
     , editableTreeModel : EditableTreeTab.Model
+    , searchableTreeModel : SearchableTreeTab.Model
     }
 
 
@@ -26,6 +28,7 @@ initModel () =
       , simpleTreeModel = SimpleTreeTab.initialModel
       , recursiveJsonTreeModel = RecursiveJsonTreeTab.initialModel
       , editableTreeModel = EditableTreeTab.initialModel
+      , searchableTreeModel = SearchableTreeTab.initialModel
       }
     , Cmd.none
     )
@@ -36,6 +39,7 @@ type Msg
     | SimpleTreeMsg SimpleTreeTab.Msg
     | RecurseJsonTreeMsg RecursiveJsonTreeTab.Msg
     | EditableTreeMsg EditableTreeTab.Msg
+    | SearchableTreeMsg SearchableTreeTab.Msg
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -58,6 +62,11 @@ update msg model =
 
         EditableTreeMsg editableTreeMsg ->
             ( { model | editableTreeModel = EditableTreeTab.update editableTreeMsg model.editableTreeModel }
+            , Cmd.none
+            )
+
+        SearchableTreeMsg searchableTreeMsg ->
+            ( { model | searchableTreeModel = SearchableTreeTab.update searchableTreeMsg model.searchableTreeModel }
             , Cmd.none
             )
 
@@ -99,6 +108,7 @@ view model =
                     [ text "Simple TreeView"
                     , text "Recursive Json TreeView"
                     , text "Editable TreeView"
+                    , text "Searchable TreeView"
                     ]
                 ]
             , tabContentView model
@@ -118,8 +128,11 @@ tabContentView model =
         1 ->
             map RecurseJsonTreeMsg (RecursiveJsonTreeTab.view model.recursiveJsonTreeModel)
 
-        _ ->
+        2 ->
             map EditableTreeMsg (EditableTreeTab.view model.editableTreeModel)
+
+        _ ->
+            map SearchableTreeMsg (SearchableTreeTab.view model.searchableTreeModel)
 
 
 subscriptions : Model -> Sub Msg
@@ -131,8 +144,12 @@ subscriptions model =
         1 ->
             Sub.map RecurseJsonTreeMsg (RecursiveJsonTreeTab.subscriptions model.recursiveJsonTreeModel)
 
-        _ ->
+        2 ->
             Sub.map EditableTreeMsg (EditableTreeTab.subscriptions model.editableTreeModel)
+
+        _ ->
+            Sub.map SearchableTreeMsg (SearchableTreeTab.subscriptions model.searchableTreeModel)
+
 
 main =
     Browser.element

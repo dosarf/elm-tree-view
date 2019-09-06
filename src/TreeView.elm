@@ -3,7 +3,7 @@ module TreeView exposing
   , NodeUid(..), uidOf, Configuration
   , Model, initializeModel, Msg
   , update, view, subscriptions
-  , expandAll, collapseAll, updateNodeData, getSelected, getVisibleAnnotatedNodes
+  , expandAll, collapseAll, expandOnly, updateNodeData, getSelected, getVisibleAnnotatedNodes
   , updateExpandedStateOf
   , Configuration2, initializeModel2, Msg2 (..), update2, view2, subscriptions2
   )
@@ -36,7 +36,7 @@ as selected node and visible nodes can be retrieved.
 
 ## Working with tree views
 
-@docs getSelected, getVisibleAnnotatedNodes, expandAll, collapseAll, updateExpandedStateOf, updateNodeData
+@docs getSelected, getVisibleAnnotatedNodes, expandAll, collapseAll, expandOnly, updateExpandedStateOf, updateNodeData
 
 ## Custom rendering nodes
 
@@ -279,9 +279,12 @@ type Msg2 comparable customMsg
 modelWithNewExpansionStates : Set.Set comparable -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 modelWithNewExpansionStates collapsedNodeUids model =
     let
-        guts = gutsOf model
+        guts =
+            gutsOf model
+
         newVisibleAnnotatedNodes =
             calculateVisibleAnnotatedNodes guts.uidThunk collapsedNodeUids guts.annotatedNodes
+
         selection =
             case guts.selection of
                 Nothing ->
@@ -324,17 +327,92 @@ expandAll model =
     modelWithNewExpansionStates Set.empty model
 
 
+uidOfNode : Guts d comparable customMsg cookie -> T.Node d -> comparable
+uidOfNode guts node =
+    guts.uidThunk node |> uidOf
+
+
 {-| Collapses all nodes.
 -}
 collapseAll : Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 collapseAll model =
     let
-        guts = gutsOf model
+        guts =
+            gutsOf model
+
         collapsedNodeUids =
             LX.filterNot isLeaf guts.annotatedNodes
-                |> List.map (\aN -> guts.uidThunk aN.node)
-                |> List.map uidOf
+                |> List.map (\aN -> uidOfNode guts aN.node)
                 |> Set.fromList
+    in
+        modelWithNewExpansionStates collapsedNodeUids model
+
+
+type alias ExpandOnlyFoldState comparable =
+    { collapsedNodeUids : Set.Set comparable
+    , expandNode : Bool
+    }
+
+
+{-| TODO
+-}
+expandOnly : (d -> Bool) -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
+expandOnly selectNode model =
+    let
+        guts =
+            gutsOf model
+
+        allNodeUids =
+            T.listForestNodes guts.forest
+                |> List.map (uidOfNode guts)
+                |> Set.fromList
+
+        preFoldingThunk : ExpandOnlyFoldState comparable -> T.Node d -> ExpandOnlyFoldState comparable
+        preFoldingThunk foldStateFromParent node =
+            { foldStateFromParent
+            | expandNode = False
+            }
+
+        postFoldingThunk : ExpandOnlyFoldState comparable -> T.Node d -> ExpandOnlyFoldState comparable -> ExpandOnlyFoldState comparable
+        postFoldingThunk foldStateFromParent node previousFoldState =
+            let
+                currentNodeSelected =
+                    selectNode <| T.dataOf node
+
+                expandCurrentNode =
+                    previousFoldState.expandNode
+
+                expandParentNode =
+                    expandCurrentNode || currentNodeSelected
+
+            in
+                if expandCurrentNode then
+                    { previousFoldState
+                    | collapsedNodeUids = Set.remove (uidOfNode guts node) previousFoldState.collapsedNodeUids
+                    , expandNode = expandParentNode
+                    }
+                else
+                    { previousFoldState
+                    | expandNode = expandParentNode
+                    }
+
+        childrenFoldingThunk : ExpandOnlyFoldState comparable -> T.Node d -> ExpandOnlyFoldState comparable -> ExpandOnlyFoldState comparable
+        childrenFoldingThunk previousFoldState node nodeFoldState =
+              { nodeFoldState
+              | expandNode = nodeFoldState.expandNode || previousFoldState.expandNode
+              }
+
+        foldOptions : T.FoldOptions d (ExpandOnlyFoldState comparable)
+        foldOptions =
+            T.FoldOptions
+                preFoldingThunk
+                postFoldingThunk
+                childrenFoldingThunk
+
+        collapsedNodeUids =
+            T.foldForest foldOptions (ExpandOnlyFoldState allNodeUids True) guts.forest
+                |> .collapsedNodeUids
+
     in
         modelWithNewExpansionStates collapsedNodeUids model
 
@@ -567,9 +645,14 @@ calculateVisibleAnnotatedNodes uidThunk collapsedNodeUids annotatedNodes =
         visibilityFoldThunk : T.AnnotatedNode d -> (Maybe Int, List (T.AnnotatedNode d)) -> (Maybe Int, List (T.AnnotatedNode d))
         visibilityFoldThunk annotatedNode foldState =
             let
-                nodeUid = uidThunk annotatedNode.node
-                collapsed = Set.member (uidOf nodeUid) collapsedNodeUids
-                nodeLevel = annotatedNode.level
+                nodeUid =
+                    uidThunk annotatedNode.node
+
+                collapsed =
+                    Set.member (uidOf nodeUid) collapsedNodeUids
+
+                nodeLevel =
+                    annotatedNode.level
             in
                 case foldState of
                     (Just visibilityThreshold, annotatedNodesSoFar) ->
@@ -580,6 +663,7 @@ calculateVisibleAnnotatedNodes uidThunk collapsedNodeUids annotatedNodes =
                                 ( Just nodeLevel, annotatedNodesSoFar ++ [ annotatedNode ] )
                             else
                                 ( Nothing, annotatedNodesSoFar ++ [ annotatedNode ] )
+
                     (Nothing, annotatedNodesSoFar) ->
                         if collapsed then
                             ( Just nodeLevel, annotatedNodesSoFar ++ [ annotatedNode ] )
