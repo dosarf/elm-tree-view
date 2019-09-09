@@ -114,36 +114,8 @@ configuration =
 
 initialModel : Model
 initialModel =
-    let
-        rootNodes =
-            [ T.Node
-              { children =
-                [ T.Node { children = [], data = nodeData "1.1" "hello" }
-                , T.Node { children = [], data = nodeData "1.2" "goodbye" }
-                , T.Node { children = [], data = nodeData "1.3" "you say yes" }
-                ]
-              , data = nodeData "1" "Beatles"
-              }
-            , T.Node
-              { children =
-                [ T.Node
-                  { children =
-                    [ T.Node { children = [], data = nodeData "2.1.1" "la" }
-                    , T.Node { children = [], data = nodeData "2.1.2" "vista" }
-                    ]
-                  , data = nodeData "2.1" "hasta"
-                  }
-                , T.Node
-                  { children = []
-                  , data = nodeData "2.2" "baby"
-                  }
-                ]
-              , data = nodeData "2" "Terminator"
-              }
-            ]
-    in
-    { rootNodes = rootNodes
-    , treeModel = TV.initializeModel2 configuration rootNodes
+    { rootNodes = warOfTheWorlds
+    , treeModel = TV.initializeModel2 configuration warOfTheWorlds
     , selectedNode = Nothing
     , searchTerm = Nothing
     , searchRegex = Nothing
@@ -275,3 +247,177 @@ view model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.map TreeViewMsg (TV.subscriptions2 model.treeModel)
+
+
+warOfTheWorlds : List (T.Node NodeData)
+warOfTheWorlds =
+    [ T.Node
+      { data = nodeData "BI" "The coming of the Martians"
+      , children =
+          [ T.Node
+              { data = nodeData "BI.1" "The Eve of the War"
+              , children =
+                  [ T.Node
+                      { data = nodeData "BI.1.1" "1"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BI.1.1a" "No one would have believed,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1b" "in the last years of the nineteenth century,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1c" "the human affairs were being watched keenly and closely"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1d" "by intelligences greater than man's"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1e" "and yet as mortal as his own;"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1f" "that as men busied themselves about their affairs"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1g" "they were scrutinized and studied,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1h" "perhaps as narrowly as a man with a microscope might scrutinize the transient creatures"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.1i" "that swarm and multiply in a drop of water."
+                              , children = []
+                              }
+                          ]
+                      }
+                  , T.Node
+                      { data = nodeData "BI.1.2" "2"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BI.1.2a" "With infinite complacency men went to and fro over this globe"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.2b" "about their little affairs,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.2c" "serene in their assurance of their empire over matter."
+                              , children = []
+                              }
+                          ]
+                      }
+                  , T.Node
+                      { data = nodeData "BI.1.3" "3"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BI.1.3a" "It is possible that the infusoria under the microscope"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.1.3b" "do the same."
+                              , children = []
+                              }
+                          ]
+                      }
+                  ]
+              }
+          , T.Node
+              { data = nodeData "BI.2" "The falling star"
+              , children =
+                  [ T.Node
+                      { data = nodeData "BI.2.1" "1"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BI.2.1a" "Then came the night of the first falling star."
+                              , children = []
+                              }
+                          ]
+                      }
+                  , T.Node
+                      { data = nodeData "BI.2.2" "2"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BI.2.2a" "It was seen early in the morning rushing over Winchester eastward,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.2.2b" "a line of flame,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.2.2c" "high in the atmosphere."
+                              , children = []
+                              }
+                          ]
+                      }
+                  , T.Node
+                      { data = nodeData "BI.2.3" "3"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BI.2.3a" "Hundreds must have seen it,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BI.2.2b" "and taken it for an ordinary falling star."
+                              , children = []
+                              }
+                          ]
+                      }
+                  ]
+              }
+          ]
+      }
+    , T.Node
+      { data = nodeData "BII" "The Earth under the Martians"
+      , children =
+          [ T.Node
+              { data = nodeData "BII.1" "Under Foot"
+              , children =
+                  [ T.Node
+                      { data = nodeData "BII.1.1" "1"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BII.1.1a" "In the first book I have wandered so much from my own adventures"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BII.1.1b" "to tell the experiences of my brother,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BII.1.1c" "that all through the last two chapters I and the curate have been lurking"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BII.1.1d" "in the emptu house at Halliford,"
+                              , children = []
+                              }
+                          , T.Node
+                              { data = nodeData "BII.1.1e" "whither we fled to escape the Black Smoke."
+                              , children = []
+                              }
+                          ]
+                      }
+                  , T.Node
+                      { data = nodeData "BII.1.2" "2"
+                      , children =
+                          [ T.Node
+                              { data = nodeData "BII.1.2a" "There I will resume."
+                              , children = []
+                              }
+                          ]
+                      }
+                  ]
+              }
+          ]
+      }
+    ]
