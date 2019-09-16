@@ -155,11 +155,16 @@ intTreeViewModel =
     in
         TV.initializeModel cfg intDataTree
 
-
-visibleNodeData : TV.Model Int Int Never () -> List Int
-visibleNodeData treeViewModel =
-    TV.getVisibleAnnotatedNodes treeViewModel
-        |> List.map (\n -> T.dataOf n.node)
+visibleAndSelectedNodeUids : (TV.Model Int Int Never (), List Int) -> (List Int, List Int)
+visibleAndSelectedNodeUids (treeViewModel, selectedNodeUids) =
+    let
+        visibleNodeUids =
+          TV.getVisibleAnnotatedNodes treeViewModel
+              |> List.map (\n -> T.dataOf n.node)
+    in
+        (visibleNodeUids
+        , selectedNodeUids
+        )
 
 
 testSuite =
@@ -242,28 +247,35 @@ testSuite =
                     let
                         nodePredicate = \_ -> False
                     in
-                        [0, 10]
-                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleNodeData)
+                        ([0, 10], [])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
             , test "expandOnly expands all ancestors of a matching leaf node, leaves other roots collapsed" <|
                 \() ->
                     let
                         nodePredicate = \i -> i == 5 -- a leaf
                     in
-                        [ 0, 1, 4, 5, 6, 10 ]
-                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleNodeData)
+                        ([ 0, 1, 4, 5, 6, 10 ], [ 5 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
             , test "expandOnly expands all ancestors of a matching intermediate node, leaves descendants and other roots collapsed" <|
                 \() ->
                     let
                         nodePredicate = \i -> i == 4
                     in
-                        [ 0, 1, 4, 10 ]
-                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleNodeData)
+                        ([ 0, 1, 4, 10 ], [ 4 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
             , test "expandOnly may expand several roots, they having matching descendant node" <|
                 \() ->
                     let
                         nodePredicate = \i -> i == 5 || i == 14
                     in
-                        [ 0, 1, 4, 5, 6, 10, 11, 14 ]
-                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleNodeData)
+                        ([ 0, 1, 4, 5, 6, 10, 11, 14 ], [ 5, 14 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
+            , test "selected node uids are in the order of traversal" <|
+                \() ->
+                    let
+                        nodePredicate = \i -> i == 4 || i == 5 || i == 11 || i == 14
+                    in
+                        ([ 0, 1, 4, 5, 6, 10, 11, 14 ], [ 4, 5, 11, 14 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
             ]
         ]

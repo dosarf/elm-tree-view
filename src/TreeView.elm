@@ -3,7 +3,7 @@ module TreeView exposing
   , NodeUid(..), uidOf, Configuration
   , Model, initializeModel, Msg
   , update, view, subscriptions
-  , expandAll, collapseAll, expandOnly, updateNodeData, getSelected, getVisibleAnnotatedNodes
+  , expandAll, collapseAll, expandOnly, updateNodeData, getSelected, getVisibleAnnotatedNodes, setSelectionTo
   , updateExpandedStateOf
   , Configuration2, initializeModel2, Msg2 (..), update2, view2, subscriptions2
   )
@@ -36,7 +36,7 @@ as selected node and visible nodes can be retrieved.
 
 ## Working with tree views
 
-@docs getSelected, getVisibleAnnotatedNodes, expandAll, collapseAll, expandOnly, updateExpandedStateOf, updateNodeData
+@docs getSelected, setSelectionTo, getVisibleAnnotatedNodes, expandAll, collapseAll, expandOnly, updateExpandedStateOf, updateNodeData
 
 ## Custom rendering nodes
 
@@ -351,18 +351,20 @@ collapseAll model =
 type alias ExpandOnlyFoldState comparable =
     { collapsedNodeUids : Set.Set comparable
     , expandNode : Bool
+    , selectedNodeUids : List comparable
     }
 
 
 {-| Expands only the parts of the tree view that are necessary to
-have nodes with their data matching a given predicate visible.
+have nodes with their data matching a given predicate visible. In addition to
+the updated model, it returns the list of node uids selected.
 
 Coupled with the support to custom-render nodes, this can be used to implement
 a basic tree search functionality:
 * custom node rendering could highlight an entire node or only parts of it matching a search criteria
 * while hiding any part of the tree that's not harboring a matching node.
 -}
-expandOnly : (d -> Bool) -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
+expandOnly : (d -> Bool) -> Model d comparable customMsg cookie -> (Model d comparable customMsg cookie, List comparable)
 expandOnly selectNode model =
     let
         guts =
@@ -375,15 +377,32 @@ expandOnly selectNode model =
 
         preFoldingThunk : ExpandOnlyFoldState comparable -> T.Node d -> ExpandOnlyFoldState comparable
         preFoldingThunk foldStateFromParent node =
-            { foldStateFromParent
-            | expandNode = False
-            }
+            let
+                currentNodeSelected =
+                    selectNode <| T.dataOf node
+
+                selectedNodeUids =
+                    if currentNodeSelected then
+                        foldStateFromParent.selectedNodeUids ++ [ uidOf <| guts.uidThunk node ]
+                    else
+                        foldStateFromParent.selectedNodeUids
+            in
+                { foldStateFromParent
+                | expandNode = False
+                , selectedNodeUids = selectedNodeUids
+                }
 
         postFoldingThunk : ExpandOnlyFoldState comparable -> T.Node d -> ExpandOnlyFoldState comparable -> ExpandOnlyFoldState comparable
         postFoldingThunk foldStateFromParent node previousFoldState =
             let
                 currentNodeSelected =
                     selectNode <| T.dataOf node
+
+                selectedNodeUids =
+                    if currentNodeSelected then
+                        previousFoldState.selectedNodeUids ++ [ uidOf <| guts.uidThunk node ]
+                    else
+                        previousFoldState.selectedNodeUids
 
                 expandCurrentNode =
                     previousFoldState.expandNode
@@ -415,12 +434,16 @@ expandOnly selectNode model =
                 postFoldingThunk
                 childrenFoldingThunk
 
+        finalFoldState =
+            T.foldForest foldOptions (ExpandOnlyFoldState allNodeUids True []) guts.forest
+
         collapsedNodeUids =
-            T.foldForest foldOptions (ExpandOnlyFoldState allNodeUids True) guts.forest
-                |> .collapsedNodeUids
+            finalFoldState.collapsedNodeUids
 
     in
-        modelWithNewExpansionStates collapsedNodeUids model
+        ( modelWithNewExpansionStates (finalFoldState.collapsedNodeUids) model
+        , finalFoldState.selectedNodeUids
+        )
 
 
 {-| Updates the data of selected nodes, similar to
@@ -492,6 +515,9 @@ findAnnotatedNodeIndex uidThunk nodeUid annotatedNodes =
         LX.findIndex (\annotatedNode -> uidOf (uidThunk annotatedNode.node) == actualNodeUid) annotatedNodes
 
 
+{-| Selects a visible node by its uid. If a node with given uid does not exist or
+is not visible, nothing happens.
+-}
 setSelectionTo : NodeUid comparable -> Model d comparable customMsg cookie -> Model d comparable customMsg cookie
 setSelectionTo nodeUid model =
     let
