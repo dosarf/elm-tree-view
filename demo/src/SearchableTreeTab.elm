@@ -157,6 +157,7 @@ type alias Model =
     , searchTerm : Maybe String
     , searchRegex : Maybe Regex.Regex
     , termError : Maybe String
+    , highlitNodeUids : List String
     }
 
 
@@ -173,6 +174,7 @@ initialModel =
     , searchTerm = Nothing
     , searchRegex = Nothing
     , termError = Nothing
+    , highlitNodeUids = []
     }
 
 
@@ -181,6 +183,7 @@ type Msg =
   | ExpandAll
   | CollapseAll
   | UseSearchTerm String
+  | SelectNextFound
 
 
 matchesSearchTerm : Maybe Regex.Regex -> NodeData -> Bool
@@ -195,6 +198,28 @@ regexOptions =
     { caseInsensitive = True
     , multiline = False
     }
+
+
+-- returns (rotated list, new head)
+rotateList : List a -> List a
+rotateList list =
+    case list of
+        [] ->
+            []
+
+        head :: rest ->
+            rest ++ [ head ]
+
+
+selectFirstHighlitNode : TV.Model NodeData String Never (Maybe Regex.Regex) -> List String -> TV.Model NodeData String Never (Maybe Regex.Regex)
+selectFirstHighlitNode treeModel highlitNodeUids =
+    let
+        firstHighlitMaybe =
+            List.head highlitNodeUids
+    in
+        firstHighlitMaybe
+            |> Maybe.map (\nUid -> TV.setSelectionTo (TV.NodeUid nUid) treeModel)
+            |> Maybe.withDefault treeModel
 
 
 update : Msg -> Model -> Model
@@ -220,12 +245,27 @@ update message model =
                                 Regex.fromStringWith regexOptions string
                                     |> Maybe.map (\rx -> (Just string, Just rx, Nothing))
                                     |> Maybe.withDefault (Just string, Nothing, Just "Invalid regular expression")
+                        (treeModel, highlitNodeUids) =
+                            TV.expandOnly (matchesSearchTerm searchRegex) model.treeModel
                     in
                         { model
-                        | treeModel = TV.expandOnly (matchesSearchTerm searchRegex) model.treeModel
+                        | treeModel = selectFirstHighlitNode treeModel highlitNodeUids
                         , searchTerm = searchTerm
                         , searchRegex = searchRegex
                         , termError = termError
+                        , highlitNodeUids = highlitNodeUids
+                        }
+
+                SelectNextFound ->
+                    let
+                        highlitNodeUids =
+                            rotateList model.highlitNodeUids
+                        treeModel =
+                            selectFirstHighlitNode model.treeModel highlitNodeUids
+                    in
+                        { model
+                        | treeModel = treeModel
+                        , highlitNodeUids = highlitNodeUids
                         }
     in
         { incompleteModel
@@ -263,10 +303,15 @@ searchTermDetails model =
               _ ->
                   span [] []
         , Mwc.TextField.view
-              [ Mwc.TextField.onInput UseSearchTerm
-              , Mwc.TextField.placeHolder "(search)"
-              , model.searchTerm |> Maybe.withDefault "" |> Mwc.TextField.value
-              ]
+            [ Mwc.TextField.onInput UseSearchTerm
+            , Mwc.TextField.placeHolder "(search)"
+            , model.searchTerm |> Maybe.withDefault "" |> Mwc.TextField.value
+            ]
+        , Mwc.Button.view
+            [ Mwc.Button.onClick SelectNextFound
+            , Mwc.Button.label "Next"
+            , Mwc.Button.disabled <| List.isEmpty model.highlitNodeUids
+            ]
         ]
 
 

@@ -357,12 +357,15 @@ type alias ExpandOnlyFoldState comparable =
 
 {-| Expands only the parts of the tree view that are necessary to
 have nodes with their data matching a given predicate visible. In addition to
-the updated model, it returns the list of node uids selected.
+the updated model, it returns the list of highlit node uids (nodes matching
+the predicate).
 
 Coupled with the support to custom-render nodes, this can be used to implement
 a basic tree search functionality:
 * custom node rendering could highlight an entire node or only parts of it matching a search criteria
-* while hiding any part of the tree that's not harboring a matching node.
+* while hiding any part of the tree that's not harboring a matching node,
+* as well as [setSelectionTo](#setSelectionTo) can be used to step selection from
+  one matching node to the next.
 -}
 expandOnly : (d -> Bool) -> Model d comparable customMsg cookie -> (Model d comparable customMsg cookie, List comparable)
 expandOnly selectNode model =
