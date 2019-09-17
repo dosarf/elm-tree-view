@@ -57,7 +57,8 @@ and identifies them by their node uid, thus a node uids must be comparable.
 * Node uids are to be unique in the scope of the forest being displayed by
 a tree view.
 * Call-site will define how to calculate the node uid for a given node, see
-  `uidThunk` in [`Configuration`](#Configuration).
+  `uidThunk` in [`Configuration`](#Configuration) and
+  [`Configuration2`](#Configuration2).
 
 To make clear when a function signature is referring to a node uid and not
 just any other old comparable value, this product type is used.
@@ -195,8 +196,12 @@ states.
 Type variables
 * `d` is the custom data,
 * `comparable` is the type of the node uid (in practice Int or String)
+* `customMsg` is the message coming (potentially) out of rendered nodes
+* `cookie` the type of data given to the [`view2`](#view2)
+  function, enabling custom node rendering to use data other than the one
+  stored in a node.
 
-See [`initializeModel`](#initializeModel).
+See [`initializeModel`](#initializeModel), [`initializeModel2`](#initializeModel2).
 -}
 type Model d comparable customMsg cookie =
     Model (Guts d comparable customMsg cookie)
@@ -356,15 +361,17 @@ type alias ExpandOnlyFoldState comparable =
 
 
 {-| Expands only the parts of the tree view that are necessary to
-have nodes with their data matching a given predicate visible. In addition to
-the updated model, it returns the list of highlit node uids (nodes matching
-the predicate).
+have nodes with their data matching a given predicate visible.
+
+
+In addition to the updated model, it returns the list of highlit node uids
+(nodes matching the predicate).
 
 Coupled with the support to custom-render nodes, this can be used to implement
 a basic tree search functionality:
 * custom node rendering could highlight an entire node or only parts of it matching a search criteria
 * while hiding any part of the tree that's not harboring a matching node,
-* as well as [setSelectionTo](#setSelectionTo) can be used to step selection from
+* as well as [`setSelectionTo`](#setSelectionTo) can be used to step selection from
   one matching node to the next.
 -}
 expandOnly : (d -> Bool) -> Model d comparable customMsg cookie -> (Model d comparable customMsg cookie, List comparable)

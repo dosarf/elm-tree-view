@@ -38,7 +38,7 @@ Added changelog to README.md, no code changes.
 Nodes can have custom HTML rendering with messages and interactions on their
 own.
 
-To upgradie from using 1.x to 2.0.0, modify 1.x TreeView model declarations
+To upgrade from using 1.x to 2.0.0, modify 1.x TreeView model declarations
 like
 
 ```
