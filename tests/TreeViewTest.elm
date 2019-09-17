@@ -60,7 +60,7 @@ configuration =
     in
         TV.Configuration (nodeText >> TV.NodeUid) nodeText TV.defaultCssClasses
 
-initTreeViewModel : List (T.Node String) -> TV.Model String String Never
+initTreeViewModel : List (T.Node String) -> TV.Model String String Never ()
 initTreeViewModel nodes =
     TV.initializeModel configuration nodes
 
@@ -71,6 +71,100 @@ parentChildTreeAnnotatedNodes =
 moreComplexTreeAnnotatedNodes : List (T.AnnotatedNode String)
 moreComplexTreeAnnotatedNodes =
     T.listAnnotatedTreeNodes moreComplexTree
+
+
+intDataTree : List (T.Node Int)
+intDataTree =
+    [ T.Node
+        { data = 0
+        , children =
+            [ T.Node
+                { data = 1
+                , children =
+                    [ T.Node
+                        { data = 2
+                        , children = []
+                        }
+                    , T.Node
+                        { data = 3
+                        , children = []
+                        }
+                    ]
+                }
+            , T.Node
+                { data = 4
+                , children =
+                    [ T.Node
+                        { data = 5
+                        , children = []
+                        }
+                    , T.Node
+                        { data = 6
+                        , children = []
+                        }
+                    ]
+                }
+            ]
+        }
+    , T.Node
+        { data = 10
+        , children =
+            [ T.Node
+                { data = 11
+                , children =
+                    [ T.Node
+                        { data = 12
+                        , children = []
+                        }
+                    , T.Node
+                        { data = 13
+                        , children = []
+                        }
+                    ]
+                }
+            , T.Node
+                { data = 14
+                , children =
+                    [ T.Node
+                        { data = 15
+                        , children = []
+                        }
+                    , T.Node
+                        { data = 16
+                        , children = []
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+
+
+intTreeViewModel : TV.Model Int Int Never ()
+intTreeViewModel =
+    let
+        uidThunk : T.Node Int -> TV.NodeUid Int
+        uidThunk =
+            T.dataOf >> TV.NodeUid
+        labelThunk : T.Node Int -> String
+        labelThunk =
+            T.dataOf >> String.fromInt
+        cfg : TV.Configuration Int Int
+        cfg =
+            TV.Configuration uidThunk labelThunk TV.defaultCssClasses
+    in
+        TV.initializeModel cfg intDataTree
+
+visibleAndSelectedNodeUids : (TV.Model Int Int Never (), List Int) -> (List Int, List Int)
+visibleAndSelectedNodeUids (treeViewModel, selectedNodeUids) =
+    let
+        visibleNodeUids =
+          TV.getVisibleAnnotatedNodes treeViewModel
+              |> List.map (\n -> T.dataOf n.node)
+    in
+        (visibleNodeUids
+        , selectedNodeUids
+        )
 
 
 testSuite =
@@ -146,5 +240,42 @@ testSuite =
                     in
                         [ T.AnnotatedNode 0 0 moreComplexTree ]
                             |> Expect.equal (TV.collapseAll model |> TV.getVisibleAnnotatedNodes)
+            ]
+        , describe "expandOnly tests"
+            [ test "expandOnly collapses all if no node data matches" <|
+                \() ->
+                    let
+                        nodePredicate = \_ -> False
+                    in
+                        ([0, 10], [])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
+            , test "expandOnly expands all ancestors of a matching leaf node, leaves other roots collapsed" <|
+                \() ->
+                    let
+                        nodePredicate = \i -> i == 5 -- a leaf
+                    in
+                        ([ 0, 1, 4, 5, 6, 10 ], [ 5 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
+            , test "expandOnly expands all ancestors of a matching intermediate node, leaves descendants and other roots collapsed" <|
+                \() ->
+                    let
+                        nodePredicate = \i -> i == 4
+                    in
+                        ([ 0, 1, 4, 10 ], [ 4 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
+            , test "expandOnly may expand several roots, they having matching descendant node" <|
+                \() ->
+                    let
+                        nodePredicate = \i -> i == 5 || i == 14
+                    in
+                        ([ 0, 1, 4, 5, 6, 10, 11, 14 ], [ 5, 14 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
+            , test "selected node uids are in the order of traversal" <|
+                \() ->
+                    let
+                        nodePredicate = \i -> i == 4 || i == 5 || i == 11 || i == 14
+                    in
+                        ([ 0, 1, 4, 5, 6, 10, 11, 14 ], [ 4, 5, 11, 14 ])
+                            |> Expect.equal (TV.expandOnly nodePredicate intTreeViewModel |> visibleAndSelectedNodeUids)
             ]
         ]
