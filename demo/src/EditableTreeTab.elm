@@ -29,17 +29,6 @@ type NodeDataMsg
     = EditContent String String -- uid content
 
 
-updateNodeData : NodeDataMsg -> NodeData -> NodeData
-updateNodeData msg nodeData =
-    case msg of
-        EditContent uid content ->
-            if nodeData.uid == uid then
-                { nodeData | content = content }
-
-            else
-                nodeData
-
-
 viewNodeData : Maybe NodeData -> T.Node NodeData -> Html.Html NodeDataMsg
 viewNodeData selectedNode node =
     let
