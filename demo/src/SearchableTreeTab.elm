@@ -6,12 +6,14 @@ import Html.Styled exposing (Html, div, map, fromUnstyled, span, text)
 import Css exposing (backgroundColor, px, rgb, width)
 import Html.Styled.Attributes exposing (css)
 import Html
+import Html.Attributes exposing (id)
 import Tree as T
 import TreeView as TV
 import Mwc.Button
 import Mwc.TextField
 import Regex
 import Json.Decode as D
+import ScrollTo
 
 {- JSON -}
 type alias JsonNode =
@@ -143,9 +145,15 @@ highlightMatches searchRegex n =
 
 viewNodeData : Maybe Regex.Regex -> T.Node NodeData -> Html.Html Never
 viewNodeData searchRegex n =
-    highlightMatches searchRegex n
-        |> List.map renderTextFragment
-        |> Html.span []
+    let
+        nUid =
+            case n of
+                T.Node node -> node.data.uid
+
+    in
+        highlightMatches searchRegex n
+            |> List.map renderTextFragment
+            |> Html.span [ id nUid ]
 
 
 
@@ -158,6 +166,7 @@ type alias Model =
     , searchRegex : Maybe Regex.Regex
     , termError : Maybe String
     , highlitNodeUids : List String
+    , scrollStatus : ScrollTo.Status
     }
 
 
@@ -175,6 +184,7 @@ initialModel =
     , searchRegex = Nothing
     , termError = Nothing
     , highlitNodeUids = []
+    , scrollStatus = ScrollTo.init
     }
 
 
@@ -184,6 +194,7 @@ type Msg =
   | CollapseAll
   | UseSearchTerm String
   | SelectNextFound
+  | ScrollMsg ScrollTo.Msg
 
 
 matchesSearchTerm : Maybe Regex.Regex -> NodeData -> Bool
@@ -222,19 +233,25 @@ selectFirstHighlitNode treeModel highlitNodeUids =
             |> Maybe.withDefault treeModel
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update message model =
     let
-        incompleteModel =
+        (incompleteModel, cmd) =
             case message of
                 TreeViewMsg tvMsg ->
-                    { model | treeModel = TV.update2 tvMsg model.treeModel }
+                    ( { model | treeModel = TV.update2 tvMsg model.treeModel }
+                    , Cmd.none
+                    )
 
                 ExpandAll ->
-                    { model | treeModel = TV.expandAll model.treeModel }
+                    ( { model | treeModel = TV.expandAll model.treeModel }
+                    , Cmd.none
+                    )
 
                 CollapseAll ->
-                    { model | treeModel = TV.collapseAll model.treeModel }
+                    ( { model | treeModel = TV.collapseAll model.treeModel }
+                    , Cmd.none
+                    )
 
                 UseSearchTerm string ->
                     let
@@ -248,13 +265,15 @@ update message model =
                         (treeModel, highlitNodeUids) =
                             TV.expandOnly (matchesSearchTerm searchRegex) model.treeModel
                     in
-                        { model
-                        | treeModel = selectFirstHighlitNode treeModel highlitNodeUids
-                        , searchTerm = searchTerm
-                        , searchRegex = searchRegex
-                        , termError = termError
-                        , highlitNodeUids = highlitNodeUids
-                        }
+                        ( { model
+                          | treeModel = selectFirstHighlitNode treeModel highlitNodeUids
+                          , searchTerm = searchTerm
+                          , searchRegex = searchRegex
+                          , termError = termError
+                          , highlitNodeUids = highlitNodeUids
+                          }
+                        , Cmd.none
+                        )
 
                 SelectNextFound ->
                     let
@@ -263,14 +282,25 @@ update message model =
                         treeModel =
                             selectFirstHighlitNode model.treeModel highlitNodeUids
                     in
-                        { model
-                        | treeModel = treeModel
-                        , highlitNodeUids = highlitNodeUids
-                        }
+                        ( { model
+                          | treeModel = treeModel
+                          , highlitNodeUids = highlitNodeUids
+                          }
+                        , Cmd.map ScrollMsg <| ScrollTo.toPosition { x = 0, y = 1000 } model.scrollStatus
+                        )
+
+                ScrollMsg scrollMsg ->
+                    Tuple.mapBoth
+                        (\scrollStatus -> { model | scrollStatus = scrollStatus })
+                        (Cmd.map ScrollMsg)
+                        (ScrollTo.update scrollMsg model.scrollStatus)
+
     in
-        { incompleteModel
-        | selectedNode = TV.getSelected incompleteModel.treeModel |> Maybe.map .node |> Maybe.map T.dataOf
-        }
+        ( { incompleteModel
+          | selectedNode = TV.getSelected incompleteModel.treeModel |> Maybe.map .node |> Maybe.map T.dataOf
+          }
+        , cmd
+        )
 
 
 expandAllCollapseAllButtons : Html Msg
@@ -344,7 +374,10 @@ view model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.map TreeViewMsg (TV.subscriptions2 model.treeModel)
+    Sub.batch
+        [ Sub.map TreeViewMsg (TV.subscriptions2 model.treeModel)
+        , ScrollTo.subscriptions ScrollMsg model.scrollStatus
+        ]
 
 
 forest : List (T.Node NodeData)
