@@ -66,10 +66,9 @@ update msg model =
             )
 
         SearchableTreeMsg searchableTreeMsg ->
-            Tuple.mapBoth
-                (\searchableTreeModel -> { model | searchableTreeModel = searchableTreeModel })
-                (Cmd.map SearchableTreeMsg)
-                (SearchableTreeTab.update searchableTreeMsg model.searchableTreeModel)
+            ( { model | searchableTreeModel = SearchableTreeTab.update searchableTreeMsg model.searchableTreeModel }
+            , Cmd.none
+            )
 
 
 {-| A plain old record holding a couple of theme colors.
