@@ -214,6 +214,7 @@ type Msg =
   | SelectNextFound
   | SyncViewport
   | UpdateViewport Viewport
+  | FocusError (Result Browser.Dom.Error ())
 
 
 matchesSearchTerm : Maybe Regex.Regex -> NodeData -> Bool
@@ -300,12 +301,18 @@ update message model =
                             rotateList model.highlitNodeUids
                         treeModel =
                             selectFirstHighlitNode model.treeModel highlitNodeUids
+                        focusCmd =
+                            highlitNodeUids
+                              |> List.head
+                              |> Maybe.map Browser.Dom.focus
+                              |> Maybe.map (Task.attempt FocusError)
+                              |> Maybe.withDefault Cmd.none
                     in
                         ( { model
                           | treeModel = treeModel
                           , highlitNodeUids = highlitNodeUids
                           }
-                        , Cmd.none
+                        , focusCmd
                         )
 
                 SyncViewport ->
@@ -321,6 +328,12 @@ update message model =
                     ( { model
                       | viewport = viewport
                       }
+                    , Cmd.none
+                    )
+
+                FocusError domErrorResult ->
+                -- TODO Consider logging the error?
+                    ( model
                     , Cmd.none
                     )
 
