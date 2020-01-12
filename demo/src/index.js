@@ -1,6 +1,7 @@
 'use strict';
 
 require('./assets/tree-view.css')
+require('./assets/scroll-support.css')
 require('./index.html');
 var elm = require('./Main.elm');
 

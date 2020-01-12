@@ -1,10 +1,13 @@
 module SearchableTreeTab exposing (
-    Model, Msg, initialModel, update, view, subscriptions
+    Model, Msg, init, update, view, subscriptions
     , NodeData, highlightMatches, TextFragment (..), jsonNodeDecoder, jsonNodeToTree, parseJsonNodes)
 
-import Html.Styled exposing (Html, div, map, fromUnstyled, span, text)
+import Browser
+import Browser.Dom exposing (Viewport)
 import Css exposing (backgroundColor, px, rgb, width)
-import Html.Styled.Attributes exposing (css)
+import Html.Styled exposing (Html, div, map, fromUnstyled, span, text)
+import Html.Styled.Attributes exposing (classList, css, id)
+import Html.Styled.Events exposing (on)
 import Html
 import Tree as T
 import TreeView as TV
@@ -12,6 +15,7 @@ import Mwc.Button
 import Mwc.TextField
 import Regex
 import Json.Decode as D
+import Task
 
 {- JSON -}
 type alias JsonNode =
@@ -158,6 +162,13 @@ type alias Model =
     , searchRegex : Maybe Regex.Regex
     , termError : Maybe String
     , highlitNodeUids : List String
+    , viewport : Viewport
+    }
+
+emptyViewport : Viewport
+emptyViewport =
+    { scene = { width = 0, height = 0 }
+    , viewport = { x = 0, y = 0, width = 0, height = 0 }
     }
 
 
@@ -166,16 +177,26 @@ configuration =
     TV.Configuration2 nodeUid viewNodeData TV.defaultCssClasses
 
 
-initialModel : Model
-initialModel =
-    { rootNodes = forest
-    , treeModel = TV.initializeModel2 configuration forest
-    , selectedNode = Nothing
-    , searchTerm = Nothing
-    , searchRegex = Nothing
-    , termError = Nothing
-    , highlitNodeUids = []
-    }
+updateViewport : Viewport -> Cmd Msg
+updateViewport previous =
+    Browser.Dom.getViewportOf "content"
+        |> Task.onError (\_ -> Task.succeed previous)
+        |> Task.perform UpdateViewport
+
+
+init : () -> (Model, Cmd Msg)
+init () =
+    ( { rootNodes = forest
+      , treeModel = TV.initializeModel2 configuration forest
+      , selectedNode = Nothing
+      , searchTerm = Nothing
+      , searchRegex = Nothing
+      , termError = Nothing
+      , highlitNodeUids = []
+      , viewport = emptyViewport
+      }
+    , updateViewport emptyViewport
+    )
 
 
 type Msg =
@@ -184,6 +205,8 @@ type Msg =
   | CollapseAll
   | UseSearchTerm String
   | SelectNextFound
+  | SyncViewport
+  | UpdateViewport Viewport
 
 
 matchesSearchTerm : Maybe Regex.Regex -> NodeData -> Bool
@@ -222,19 +245,25 @@ selectFirstHighlitNode treeModel highlitNodeUids =
             |> Maybe.withDefault treeModel
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model, Cmd Msg)
 update message model =
     let
-        incompleteModel =
+        (incompleteModel, cmd) =
             case message of
                 TreeViewMsg tvMsg ->
-                    { model | treeModel = TV.update2 tvMsg model.treeModel }
+                    ( { model | treeModel = TV.update2 tvMsg model.treeModel }
+                    , Cmd.none
+                    )
 
                 ExpandAll ->
-                    { model | treeModel = TV.expandAll model.treeModel }
+                    ( { model | treeModel = TV.expandAll model.treeModel }
+                    , Cmd.none
+                    )
 
                 CollapseAll ->
-                    { model | treeModel = TV.collapseAll model.treeModel }
+                    ( { model | treeModel = TV.collapseAll model.treeModel }
+                    , Cmd.none
+                    )
 
                 UseSearchTerm string ->
                     let
@@ -248,13 +277,15 @@ update message model =
                         (treeModel, highlitNodeUids) =
                             TV.expandOnly (matchesSearchTerm searchRegex) model.treeModel
                     in
-                        { model
-                        | treeModel = selectFirstHighlitNode treeModel highlitNodeUids
-                        , searchTerm = searchTerm
-                        , searchRegex = searchRegex
-                        , termError = termError
-                        , highlitNodeUids = highlitNodeUids
-                        }
+                        ( { model
+                          | treeModel = selectFirstHighlitNode treeModel highlitNodeUids
+                          , searchTerm = searchTerm
+                          , searchRegex = searchRegex
+                          , termError = termError
+                          , highlitNodeUids = highlitNodeUids
+                          }
+                        , Cmd.none
+                        )
 
                 SelectNextFound ->
                     let
@@ -263,14 +294,35 @@ update message model =
                         treeModel =
                             selectFirstHighlitNode model.treeModel highlitNodeUids
                     in
-                        { model
-                        | treeModel = treeModel
-                        , highlitNodeUids = highlitNodeUids
-                        }
+                        ( { model
+                          | treeModel = treeModel
+                          , highlitNodeUids = highlitNodeUids
+                          }
+                        , Cmd.none
+                        )
+
+                SyncViewport ->
+                    ( model
+                    , updateViewport model.viewport
+                    )
+
+                UpdateViewport viewport ->
+                    let
+                        _ =
+                            Debug.log "viewport" viewport
+                    in
+                    ( { model
+                      | viewport = viewport
+                      }
+                    , Cmd.none
+                    )
+
     in
-        { incompleteModel
-        | selectedNode = TV.getSelected incompleteModel.treeModel |> Maybe.map .node |> Maybe.map T.dataOf
-        }
+        ( { incompleteModel
+          | selectedNode = TV.getSelected incompleteModel.treeModel |> Maybe.map .node |> Maybe.map T.dataOf
+          }
+        , cmd
+        )
 
 
 expandAllCollapseAllButtons : Html Msg
@@ -293,7 +345,9 @@ expandAllCollapseAllButtons =
 searchTermDetails : Model -> Html Msg
 searchTermDetails model =
     div
-        [ css [ width (px 300) ] ]
+        [ css [ width (px 300) ]
+        , classList [ ( "nav-sticky", model.viewport.viewport.y > 200 ) ]
+        ]
         [ case model.termError of
               Just termError ->
                   div
@@ -334,7 +388,9 @@ selectedNodeDetails model =
 view : Model -> Html Msg
 view model =
     div
-      []
+      [ id "content"
+      , on "scroll" (D.succeed SyncViewport)
+      ]
       [ expandAllCollapseAllButtons
       , searchTermDetails model
       , selectedNodeDetails model

@@ -24,14 +24,18 @@ type alias Model =
 
 initModel : () -> (Model, Cmd Msg)
 initModel () =
-    ( { currentTab = 1
-      , simpleTreeModel = SimpleTreeTab.initialModel
-      , recursiveJsonTreeModel = RecursiveJsonTreeTab.initialModel
-      , editableTreeModel = EditableTreeTab.initialModel
-      , searchableTreeModel = SearchableTreeTab.initialModel
-      }
-    , Cmd.none
-    )
+    let
+        (searchableTreeModel, searchableTreeCmd) =
+             SearchableTreeTab.init ()
+    in
+        ( { currentTab = 1
+          , simpleTreeModel = SimpleTreeTab.initialModel
+          , recursiveJsonTreeModel = RecursiveJsonTreeTab.initialModel
+          , editableTreeModel = EditableTreeTab.initialModel
+          , searchableTreeModel = searchableTreeModel
+          }
+        , Cmd.map SearchableTreeMsg searchableTreeCmd
+        )
 
 
 type Msg
@@ -66,9 +70,13 @@ update msg model =
             )
 
         SearchableTreeMsg searchableTreeMsg ->
-            ( { model | searchableTreeModel = SearchableTreeTab.update searchableTreeMsg model.searchableTreeModel }
-            , Cmd.none
-            )
+            let
+                (searchableTreeModel, searchableTreeCmd) =
+                    SearchableTreeTab.update searchableTreeMsg model.searchableTreeModel
+            in
+                ( { model | searchableTreeModel = searchableTreeModel }
+                , Cmd.map SearchableTreeMsg searchableTreeCmd
+                )
 
 
 {-| A plain old record holding a couple of theme colors.
