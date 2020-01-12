@@ -6,6 +6,7 @@ import Html.Styled exposing (Html, div, map, fromUnstyled, span, text)
 import Css exposing (backgroundColor, px, rgb, width)
 import Html.Styled.Attributes exposing (css)
 import Html
+import Html.Attributes
 import Tree as T
 import TreeView as TV
 import Mwc.Button
@@ -141,11 +142,17 @@ highlightMatches searchRegex n =
             |> Maybe.withDefault [Vanilla nodeLabel]
 
 
+nodeUidStr : T.Node NodeData -> String
+nodeUidStr n =
+    case n of
+        T.Node node -> node.data.uid
+
+
 viewNodeData : Maybe Regex.Regex -> T.Node NodeData -> Html.Html Never
 viewNodeData searchRegex n =
     highlightMatches searchRegex n
         |> List.map renderTextFragment
-        |> Html.span []
+        |> Html.span [ Html.Attributes.id <| nodeUidStr n ]
 
 
 
