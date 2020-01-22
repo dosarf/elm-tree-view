@@ -66,9 +66,13 @@ update msg model =
             )
 
         SearchableTreeMsg searchableTreeMsg ->
-            ( { model | searchableTreeModel = SearchableTreeTab.update searchableTreeMsg model.searchableTreeModel }
-            , Cmd.none
-            )
+            let
+                ( searchableTreeModel, cmd ) =
+                    SearchableTreeTab.update searchableTreeMsg model.searchableTreeModel
+            in
+                ( { model | searchableTreeModel = searchableTreeModel }
+                , Cmd.map SearchableTreeMsg cmd
+                )
 
 
 {-| A plain old record holding a couple of theme colors.

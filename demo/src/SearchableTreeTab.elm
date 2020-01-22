@@ -13,6 +13,8 @@ import Mwc.Button
 import Mwc.TextField
 import Regex
 import Json.Decode as D
+import Task
+import Browser.Dom
 
 {- JSON -}
 type alias JsonNode =
@@ -191,6 +193,7 @@ type Msg =
   | CollapseAll
   | UseSearchTerm String
   | SelectNextFound
+  | SetViewportResult (Result Browser.Dom.Error ())
 
 
 matchesSearchTerm : Maybe Regex.Regex -> NodeData -> Bool
@@ -229,55 +232,116 @@ selectFirstHighlitNode treeModel highlitNodeUids =
             |> Maybe.withDefault treeModel
 
 
-update : Msg -> Model -> Model
+jumpToTask : String -> Cmd Msg
+jumpToTask targetId =
+    Task.map3
+            (\element element2 viewport -> ((Debug.log "vp" viewport).viewport.x, viewport.viewport.y + (Debug.log "e" element).element.y - (Debug.log "e2" element2).element.y))
+            (Browser.Dom.getElement (Debug.log "target" targetId))
+            (Browser.Dom.getElement "navigableTreeContent")
+            (Browser.Dom.getViewportOf "navigableTreeContent")
+        |> Task.andThen (\(x, y) -> Browser.Dom.setViewportOf "navigableTreeContent" x (Debug.log "y" y))
+        |> Task.attempt SetViewportResult
+
+
+jumpToCmd : Maybe NodeData -> Cmd Msg
+jumpToCmd selectedNode =
+    selectedNode
+        |> Maybe.map .uid
+        |> Maybe.map jumpToTask
+        |> Maybe.withDefault Cmd.none
+
+
+update : Msg -> Model -> (Model, Cmd Msg)
 update message model =
-    let
-        incompleteModel =
-            case message of
-                TreeViewMsg tvMsg ->
-                    { model | treeModel = TV.update2 tvMsg model.treeModel }
+    case message of
+        TreeViewMsg tvMsg ->
+            let
+                treeModel =
+                    TV.update2 tvMsg model.treeModel
+            in
+                ( { model
+                  | treeModel = treeModel
+                  , selectedNode = TV.getSelected treeModel |> Maybe.map .node |> Maybe.map T.dataOf
+                  }
+                , Cmd.none
+                )
 
-                ExpandAll ->
-                    { model | treeModel = TV.expandAll model.treeModel }
+        ExpandAll ->
+            let
+                treeModel =
+                    TV.expandAll model.treeModel
+            in
+                ( { model
+                  | treeModel = treeModel
+                  , selectedNode = TV.getSelected treeModel |> Maybe.map .node |> Maybe.map T.dataOf
+                  }
+                , Cmd.none
+                )
 
-                CollapseAll ->
-                    { model | treeModel = TV.collapseAll model.treeModel }
+        CollapseAll ->
+            let
+                treeModel =
+                    TV.collapseAll model.treeModel
+            in
+                ( { model
+                  | treeModel = treeModel
+                  , selectedNode = TV.getSelected treeModel |> Maybe.map .node |> Maybe.map T.dataOf
+                  }
+                , Cmd.none
+                )
 
-                UseSearchTerm string ->
-                    let
-                        (searchTerm, searchRegex, termError) =
-                            if String.isEmpty string then
-                                (Nothing, Nothing, Nothing)
-                            else
-                                Regex.fromStringWith regexOptions string
-                                    |> Maybe.map (\rx -> (Just string, Just rx, Nothing))
-                                    |> Maybe.withDefault (Just string, Nothing, Just "Invalid regular expression")
-                        (treeModel, highlitNodeUids) =
-                            TV.expandOnly (matchesSearchTerm searchRegex) model.treeModel
-                    in
-                        { model
-                        | treeModel = selectFirstHighlitNode treeModel highlitNodeUids
-                        , searchTerm = searchTerm
-                        , searchRegex = searchRegex
-                        , termError = termError
-                        , highlitNodeUids = highlitNodeUids
-                        }
+        UseSearchTerm string ->
+            let
+                (searchTerm, searchRegex, termError) =
+                    if String.isEmpty string then
+                        (Nothing, Nothing, Nothing)
+                    else
+                        Regex.fromStringWith regexOptions string
+                            |> Maybe.map (\rx -> (Just string, Just rx, Nothing))
+                            |> Maybe.withDefault (Just string, Nothing, Just "Invalid regular expression")
+                (treeModel, highlitNodeUids) =
+                    TV.expandOnly (matchesSearchTerm searchRegex) model.treeModel
+                selectedNode =
+                    TV.getSelected treeModel |> Maybe.map .node |> Maybe.map T.dataOf
+            in
+                ( { model
+                  | treeModel = selectFirstHighlitNode treeModel highlitNodeUids
+                  , searchTerm = searchTerm
+                  , searchRegex = searchRegex
+                  , termError = termError
+                  , highlitNodeUids = highlitNodeUids
+                  , selectedNode = selectedNode
+                  }
+                , jumpToCmd selectedNode
+                )
 
-                SelectNextFound ->
-                    let
-                        highlitNodeUids =
-                            rotateList model.highlitNodeUids
-                        treeModel =
-                            selectFirstHighlitNode model.treeModel highlitNodeUids
-                    in
-                        { model
-                        | treeModel = treeModel
-                        , highlitNodeUids = highlitNodeUids
-                        }
-    in
-        { incompleteModel
-        | selectedNode = TV.getSelected incompleteModel.treeModel |> Maybe.map .node |> Maybe.map T.dataOf
-        }
+        SelectNextFound ->
+            let
+                highlitNodeUids =
+                    rotateList model.highlitNodeUids
+                targetId =
+                    model.selectedNode
+                        |> Maybe.map .uid
+                        |> Maybe.withDefault "none"
+                treeModel =
+                    selectFirstHighlitNode model.treeModel highlitNodeUids
+                selectedNode =
+                    TV.getSelected treeModel |> Maybe.map .node |> Maybe.map T.dataOf
+            in
+                ( { model
+                  | treeModel = treeModel
+                  , highlitNodeUids = highlitNodeUids
+                  , selectedNode = selectedNode
+                  }
+                , jumpToCmd selectedNode
+                )
+
+        SetViewportResult result ->
+            let
+                _ =
+                    Debug.log "Jump result" result
+            in
+                (model, Cmd.none)
 
 
 expandAllCollapseAllButtons : Html Msg
@@ -345,7 +409,10 @@ view model =
       [ expandAllCollapseAllButtons
       , searchTermDetails model
       , selectedNodeDetails model
-      , map TreeViewMsg (TV.view2 model.searchRegex model.treeModel |> fromUnstyled)
+      , div
+          [ Html.Styled.Attributes.id "navigableTreeContent" ]
+          [ map TreeViewMsg (TV.view2 model.searchRegex model.treeModel |> fromUnstyled)
+          ]
       ]
 
 

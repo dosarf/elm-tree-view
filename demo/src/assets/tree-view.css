@@ -43,3 +43,9 @@ td.tree-view-bullet-leaf {
   background-size: contain;
   width: 1em;
 }
+
+#navigableTreeContent {
+  width: 100vw;
+  height: 500px;
+  overflow: auto;
+}
