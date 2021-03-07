@@ -139,7 +139,7 @@ From here on, switch to using types and functions with the suffix `2`, such as
 
 ### 3.x
 
-#### 3.0.0 (TODO)
+#### 3.0.0 (2019-09-17)
 
 ##### Cookie for custom node rendering
 Custom node rendering function can now use cookie data - data that is not
