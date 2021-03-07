@@ -235,11 +235,11 @@ selectFirstHighlitNode treeModel highlitNodeUids =
 jumpToTask : String -> Cmd Msg
 jumpToTask targetId =
     Task.map3
-            (\element element2 viewport -> ((Debug.log "vp" viewport).viewport.x, viewport.viewport.y + (Debug.log "e" element).element.y - (Debug.log "e2" element2).element.y))
-            (Browser.Dom.getElement (Debug.log "target" targetId))
+            (\element element2 viewport -> (viewport.viewport.x, viewport.viewport.y + element.element.y - element2.element.y))
+            (Browser.Dom.getElement targetId)
             (Browser.Dom.getElement "navigableTreeContent")
             (Browser.Dom.getViewportOf "navigableTreeContent")
-        |> Task.andThen (\(x, y) -> Browser.Dom.setViewportOf "navigableTreeContent" x (Debug.log "y" y))
+        |> Task.andThen (\(x, y) -> Browser.Dom.setViewportOf "navigableTreeContent" x y)
         |> Task.attempt SetViewportResult
 
 
@@ -337,11 +337,7 @@ update message model =
                 )
 
         SetViewportResult result ->
-            let
-                _ =
-                    Debug.log "Jump result" result
-            in
-                (model, Cmd.none)
+            (model, Cmd.none)
 
 
 expandAllCollapseAllButtons : Html Msg

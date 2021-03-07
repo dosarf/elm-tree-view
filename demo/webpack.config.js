@@ -16,15 +16,21 @@ module.exports = {
     rules: [{
         test: /\.html$/,
         exclude: /node_modules/,
-        loader: 'file-loader?name=[name].[ext]'
+        use: [{
+          loader: 'file-loader',
+          options: {
+            name: '[name].[ext]',
+            debug: true
+          }
+        }]
       },
       {
         test: /\.elm$/,
         exclude: [/elm-stuff/, /node_modules/],
-        loader: 'elm-webpack-loader',
-        options: {
-          debug: true
-        }
+        use: [{
+          loader: 'elm-webpack-loader',
+          options: {}
+        }]
       },
       {
         test: /\.css$/i,
