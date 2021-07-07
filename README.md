@@ -66,7 +66,7 @@ For that,
 ```
     type alias Model =
         { ...
-        , treeViewModel = TreeView.Model MyData String Never ()
+        , treeViewModel : TreeView.Model MyData String Never ()
         , ...
         }
 
