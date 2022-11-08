@@ -15,7 +15,7 @@
   "dependencies": {
     "elm-webpack-loader": "^7.0.1",
     "file-loader": "6.2.0",
-    "loader-utils": "2.0.0",
+    "loader-utils": "2.0.3",
     "material-components-elm-js-imports": "^1.3.0",
     "webpack": "^5.24.3",
     "webpack-dev-server": "^3.11.2"
